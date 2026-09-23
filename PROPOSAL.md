@@ -15,6 +15,9 @@
 | Indexed position commitment | Public ledger | Everyone |
 | Position side and salt | Private circuit input | Participant; later trusted resolver and its proof server |
 | Winning quote side and allocation target | Public ledger | Everyone |
+| Quote A, Quote B, and KAI token colors and issuance status | Public ledger | Everyone |
+| Contract-mediated trade side, amount, fee, and unshielded recipient | Public transaction | Everyone |
+| NIGHT side reserves, fee pool, fee schedule, and KAI distributed total | Public ledger | Everyone |
 
 [I WILL FILL IN THE ROWS]
 
