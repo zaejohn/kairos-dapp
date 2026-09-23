@@ -21,10 +21,11 @@ import { targetReserveA } from "@/lib/market/allocation";
 const INDEXER_HTTP = "https://indexer.preprod.midnight.network/api/v4/graphql";
 const INDEXER_WS = "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
 const PROOF_SERVER = "http://127.0.0.1:6301";
-type CircuitId = "commitPosition" | "resolveRound" | "startNextRound" | "initializeEconomy" | "buyQuote" | "sellQuote" | "rebalanceTreasury";
+type CircuitId = "commitPosition" | "resolveRound" | "expireRound" | "startNextRound" | "initializeEconomy" | "buyQuote" | "sellQuote" | "rebalanceTreasury";
 
 export interface MarketSnapshot {
   round: bigint;
+  roundCloseAt: bigint;
   phase: bigint;
   positions: bigint;
   winner: bigint;
@@ -57,6 +58,7 @@ export async function readPublicMarket(contractAddress: string): Promise<MarketS
   const view = ledger(state.data);
   return {
     round: view.round,
+    roundCloseAt: view.roundCloseAt,
     phase: view.phase,
     positions: view.nextIndex,
     winner: view.winner,
@@ -168,7 +170,8 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
   return {
     snapshot: readPublicMarket,
     async deploy() {
-      const deployed = await deployContract(providers, { compiledContract });
+      const firstRoundCloseAt = BigInt(Math.floor(Date.now() / 1000) + 604_800);
+      const deployed = await deployContract(providers, { compiledContract, args: [firstRoundCloseAt] });
       const publicData = deployed.deployTxData.public;
       return { contractAddress: publicData.contractAddress, receipt: { txId: publicData.txId, blockHeight: publicData.blockHeight } };
     },
@@ -180,6 +183,11 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
     async resolve(contractAddress: string, openings: Opening[]): Promise<PublicTxReceipt> {
       const contract = await found(contractAddress);
       const result = await contract.callTx.resolveRound(openings);
+      return { txId: result.public.txId, blockHeight: result.public.blockHeight };
+    },
+    async expire(contractAddress: string): Promise<PublicTxReceipt> {
+      const contract = await found(contractAddress);
+      const result = await contract.callTx.expireRound();
       return { txId: result.public.txId, blockHeight: result.public.blockHeight };
     },
     async startNextRound(contractAddress: string): Promise<PublicTxReceipt> {

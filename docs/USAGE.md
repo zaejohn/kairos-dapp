@@ -10,11 +10,11 @@
 
 1. Start the app as described in the README and check the proof server in Settings.
 2. Connect Lace and confirm it is on Preprod. Set a strong local storage password in Settings. Keep this password safe; it protects Midnight signing-key storage in this browser.
-3. Load a verified Preprod contract address in Settings. If you are the operator and no address exists, use **Deploy new Preprod contract** and record the finalized address and transaction ID. A deployment is real only after the app shows a finalized receipt and public state can be read.
+3. Load a verified Preprod contract address in Settings. If you are the operator and no address exists, use **Deploy new Preprod contract** and record the finalized address and transaction ID. The first round closes seven days after deployment was requested; confirm the public close time in the status strip. A deployment is real only after the app shows a finalized receipt and public state can be read.
 4. In an open round, choose Quote A or Quote B and select **Prepare private opening**. Download the JSON opening. Keep it private and backed up.
 5. Acknowledge that you saved it, then submit the commitment through Lace. Keep the opening even if the app shows an error until you verify whether the transaction finalized.
-6. After eight commitments, send each opening to the trusted resolver through a private channel. Each file contains its side and salt. The resolver orders all eight by public commitment index and pastes their JSON objects as one array into the resolution panel.
-7. The resolver proves the complete round. The public state then shows the winner and 70/30 allocation target. A tie preserves the previous target.
+6. Before the public close time, send each opening to the trusted resolver through a private channel. Each file contains its side and salt. The resolver orders all eight by public commitment index and pastes their JSON objects as one array into the resolution panel.
+7. After close and within one day, the resolver proves a complete eight-position round. The public state then shows the winner and 70/30 allocation target. A tie preserves the previous target. If openings are missing or the resolver misses that window, anyone may select **Expire missed round** after the one-day window; no new winner or target is set.
 8. After a resolved round, use **Apply resolved allocation** to change the internal NIGHT redemption limits to the public target. A new round cannot start until the current reserve split matches that target. If later trades change the split, apply the allocation again. Read the side reserves before trading: a quote cannot be sold if its side reserve is insufficient.
 9. If the three tokens have not yet been issued, use **Initialize fixed token economy** once. For a trade, choose Buy or Sell, a quote side, and a gross whole-number amount in atomic units. Review the public fee and net output before submitting through Lace. A trade may also distribute KAI while fixed inventory remains.
 
@@ -35,6 +35,7 @@ Token issuance, trade side, gross amount, fee, payout address, reserve values, a
 - **Proof or submission error:** retain the opening file, check DUST, Lace prompts, proof server health, and the current round before retrying. Inspect the public contract state before assuming a failed transaction.
 - **Round advanced before submission:** the contract rejects an opening made for an older round. Load the new round and prepare a fresh opening.
 - **Resolution fails:** provide exactly eight valid opening objects in commitment order, all for this contract and round. A missing or altered salt cannot be recovered by Kairos.
+- **Deadline blocks a call:** commitments close at the displayed time; resolution opens then and lasts one day. After that, expire the round and apply any required allocation before starting the next seven-day round.
 - **Trade fails:** check that genesis was finalized, that your Lace wallet has the input asset and DUST, that quote inventory covers a buy, or that the selected side reserve covers a sell. Refresh the public state after any transaction before retrying.
 
 ## One-Minute Demo Capture Checklist

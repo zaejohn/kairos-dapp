@@ -5,6 +5,7 @@ import { Contract, ledger, type Opening } from "../managed/kairos/contract/index
 const contractAddress = sampleContractAddress();
 const coinPublicKey = { bytes: new Uint8Array(32) };
 const recipient = { bytes: encodeUserAddress(sampleUserAddress()) };
+const FIRST_CLOSE = 1_700_604_800;
 
 function opening(side: bigint, marker: number): Opening {
   const salt = new Uint8Array(32);
@@ -14,8 +15,9 @@ function opening(side: bigint, marker: number): Opening {
 
 function setup() {
   const contract = new Contract({});
-  const initial = contract.initialState(createConstructorContext({}, coinPublicKey));
-  let context = createCircuitContext(contractAddress, coinPublicKey, initial.currentContractState, {});
+  const initial = contract.initialState(createConstructorContext({}, coinPublicKey), BigInt(FIRST_CLOSE));
+  let now = FIRST_CLOSE - 604_800;
+  let context = createCircuitContext(contractAddress, coinPublicKey, initial.currentContractState, {}, undefined, undefined, now);
   let quoteAInventory = 1_000_000n;
   let quoteBInventory = 1_000_000n;
   // Circuit execution models state transitions, but it does not settle the
@@ -31,16 +33,31 @@ function setup() {
       [{ tag: "unshielded" as const, raw: decodeRawTokenType(publicState.quoteBColor) }, quoteBInventory],
       [{ tag: "unshielded" as const, raw: decodeRawTokenType(publicState.kaiColor) }, 1_000_000n - publicState.kaiDistributed],
     ]);
-    context = createCircuitContext(contractAddress, coinPublicKey, state, {});
+    context = createCircuitContext(contractAddress, coinPublicKey, state, {}, undefined, undefined, now);
+  }
+  function setTime(time: number) {
+    now = time;
+    if (ledger(context.currentQueryContext.state).economyIssued) settleBalances();
+    else context = createCircuitContext(contractAddress, coinPublicKey, context.currentQueryContext.state, {}, undefined, undefined, now);
   }
   return {
     contract,
     state: () => ledger(context.currentQueryContext.state),
+    at(time: number) {
+      setTime(time);
+    },
     commit(value: Opening) {
       context = contract.circuits.commitPosition(context, ledger(context.currentQueryContext.state).round, value.side, value.salt).context;
     },
     resolve(values: Opening[]) {
+      if (ledger(context.currentQueryContext.state).phase === 1n) setTime(Number(ledger(context.currentQueryContext.state).roundCloseAt));
       context = contract.circuits.resolveRound(context, values).context;
+    },
+    resolveNow(values: Opening[]) {
+      context = contract.circuits.resolveRound(context, values).context;
+    },
+    expire() {
+      context = contract.circuits.expireRound(context).context;
     },
     next() {
       context = contract.circuits.startNextRound(context).context;
@@ -71,6 +88,42 @@ function setup() {
 }
 
 describe("Kairos bounded private market", () => {
+  it("rejects first close values that could wrap weekly deadline arithmetic", () => {
+    const contract = new Contract({});
+    expect(() => contract.initialState(createConstructorContext({}, coinPublicKey), 0n)).toThrow(/invalid first close/);
+    expect(() => contract.initialState(createConstructorContext({}, coinPublicKey), 9_223_372_036_854_775_807n)).toThrow(/invalid first close/);
+  });
+
+  it("enforces the weekly close and expires missing openings after a one-day window", () => {
+    const market = setup();
+    expect(market.state().roundCloseAt).toBe(BigInt(FIRST_CLOSE));
+    const positions = Array.from({ length: 8 }, (_, index) => opening(0n, index + 1));
+    positions.forEach(market.commit);
+    expect(() => market.resolveNow(positions)).toThrow(/round is still open/);
+    market.at(FIRST_CLOSE);
+    expect(() => market.commit(opening(1n, 9))).toThrow();
+    market.resolveNow(positions);
+    market.next();
+    expect(market.state().roundCloseAt).toBe(BigInt(FIRST_CLOSE + 604_800));
+    market.commit(opening(1n, 9));
+    market.at(FIRST_CLOSE + 604_800 + 86_400);
+    expect(() => market.commit(opening(0n, 10))).toThrow(/round is closed/);
+    market.expire();
+    expect([market.state().winner, market.state().phase]).toEqual([2n, 2n]);
+    market.next();
+    expect(market.state().roundCloseAt).toBe(BigInt(FIRST_CLOSE + 1_209_600));
+  });
+
+  it("closes the resolution window even for a complete round", () => {
+    const market = setup();
+    const positions = Array.from({ length: 8 }, (_, index) => opening(index < 5 ? 0n : 1n, index + 1));
+    positions.forEach(market.commit);
+    market.at(FIRST_CLOSE + 86_400);
+    expect(() => market.resolveNow(positions)).toThrow(/resolution window expired/);
+    market.expire();
+    expect([market.state().winner, market.state().targetA, market.state().targetB]).toEqual([2n, 50n, 50n]);
+  });
+
   it("publishes only commitments until a complete round resolves", () => {
     const market = setup();
     const positions = Array.from({ length: 8 }, (_, index) => opening(index < 5 ? 0n : 1n, index + 1));

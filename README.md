@@ -14,17 +14,17 @@ No public demo URL has been verified. Run the app locally using the instructions
 
 ## What This Product Does
 
-Kairos is building a self-rebalancing treasury driven by private market conviction. The Compact contract accepts eight salted quote-side commitments per round, proves that all eight openings match the public commitments, and publishes one winner. It sets a 70/30 allocation target for the winning side; a tie retains the previous target. The next round starts only after the current internal reserve split matches that target.
+Kairos is building a self-rebalancing treasury driven by private market conviction. The Compact contract accepts eight salted quote-side commitments before a public weekly close, proves that all eight openings match the public commitments during a one-day resolution window, and publishes one winner. It sets a 70/30 allocation target for the winning side; a tie retains the previous target. Missing openings let anyone expire the round after the window without changing policy. The next round starts only after the current internal reserve split matches that target.
 
 The same contract now compiles with a fixed, one-time contract-custodied issuance of Quote A, Quote B, and KAI; public NIGHT/quote buy and sell routes with asymmetric basis-point fees; a fixed-supply KAI trade incentive; and a separate call that reapportions internal NIGHT redemption limits after resolution. These circuits and their accounting tests have **local evidence only**. No issuance, trade, reserve change, or finalized deployment has been observed on Preprod. The route does not provide an external exchange or guarantee redemption when a side reserve is depleted. Wallet-to-wallet transfers bypass Kairos fees, so no token-wide tax is claimed.
 
 ## Initial Idea
 
-Kairos aims to let private weekly market conviction guide a public DeFi treasury allocation. The contract proves a bounded aggregate signal and implements internal reserve policy; weekly timing and external liquidity execution remain unimplemented.
+Kairos aims to let private weekly market conviction guide a public DeFi treasury allocation. The contract proves a bounded aggregate signal, enforces seven-day round deadlines after a publicly chosen first close, and implements internal reserve policy. Someone must still submit resolution, expiry, and treasury calls; external liquidity execution remains unimplemented.
 
 ## Privacy Model
 
-- **Public:** transaction timing, commitment order/count and hashes, round phase, winner, allocation targets, token colors, reserves, fees, trade side/amount/recipient, and KAI distribution total.
+- **Public:** round close time, transaction timing, commitment order/count and hashes, round phase, winner, allocation targets, token colors, reserves, fees, trade side/amount/recipient, and KAI distribution total.
 - **Private from the public ledger:** the side and random salt supplied to each commitment circuit, and the eight openings supplied to the resolution circuit.
 - **Proved:** every opening matches its indexed commitment and the published winner follows the complete eight-opening tally.
 
@@ -50,7 +50,7 @@ Node.js 22, npm, Docker, Compact compiler 0.31.1, a Preprod Lace wallet for tran
 4. Run `npm run compact:compile` to create `contracts/managed/kairos` and public proving artifacts under `public/zk/kairos`.
 5. Run `npm run proof:up` and `npm run proof:status`. The dedicated Kairos server binds `127.0.0.1:6301`. If Lace is configured for local proving, it separately expects a trusted server at `localhost:6300` according to Midnight's [toolchain guide](https://docs.midnight.network/getting-started/installation); ensure that service is available before wallet transactions.
 6. Run `npm run dev`, then open `http://localhost:3000` in a browser with Lace on Preprod.
-7. Connect Lace, enter a 16+ character local storage password, and use the Settings panel to deploy a contract if no verified address is available. Save the returned public address and transaction ID. On a deployed contract, initialize the fixed token economy once before using the trade routes.
+7. Connect Lace, enter a 16+ character local storage password, and use the Settings panel to deploy a contract if no verified address is available. Deployment sets the first close to seven days from the browser's current time. Save the returned public address and transaction ID, then confirm the public close time. On a deployed contract, initialize the fixed token economy once before using the trade routes.
 
 The app has no server-held wallet keys. The browser encrypts local Midnight signing-key storage using the password you supply. It is not a recovery phrase. Never send opening files to an untrusted resolver.
 
@@ -65,7 +65,7 @@ npm run test:e2e
 npm run proof:smoke
 ```
 
-`npm run verify` runs compile, contract tests, fast checks, and build. Browser tests need Playwright Chromium (`npx playwright install chromium`). `proof:smoke` additionally requires the local proof server at `127.0.0.1:6301` and checks/proves all seven circuits with synthetic inputs. It does not balance or submit a transaction. Local checks are not evidence of a successful Preprod transaction.
+`npm run verify` runs compile, contract tests, fast checks, and build. Browser tests need Playwright Chromium (`npx playwright install chromium`). `proof:smoke` additionally requires the local proof server at `127.0.0.1:6301` and checks/proves all eight circuits with synthetic inputs. It does not balance or submit a transaction. Local checks are not evidence of a successful Preprod transaction.
 
 ## CI/CD
 

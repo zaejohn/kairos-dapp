@@ -18,6 +18,7 @@ export struct Tally {
 }
 
 export ledger round: Uint<32>;
+export ledger roundCloseAt: Uint<64>; // public Unix seconds, chosen at deployment
 export ledger commitments: Map<Uint<8>, Bytes<32>>;
 export ledger nextIndex: Uint<8>;
 export ledger phase: Uint<8>; // 0 open, 1 full, 2 resolved
@@ -37,8 +38,11 @@ export ledger buyFeeB: Uint<16>;
 export ledger sellFeeA: Uint<16>;
 export ledger sellFeeB: Uint<16>;
 
-constructor() {
+constructor(firstRoundCloseAt: Uint<64>) {
+  // Leave room for all Uint<32> weekly rounds and their one-day grace periods.
+  assert(firstRoundCloseAt > 0 && firstRoundCloseAt < (9223372036854775807 as Uint<64>), "invalid first close");
   round = 1;
+  roundCloseAt = disclose(firstRoundCloseAt);
   nextIndex = 0;
   phase = 0;
   winner = 2;
@@ -157,6 +161,7 @@ circuit commitment(currentRound: Uint<32>, side: Uint<8>, salt: Bytes<32>): Byte
 
 export circuit commitPosition(expectedRound: Uint<32>, side: Uint<8>, salt: Bytes<32>): [] {
   assert(phase == 0, "round is not open");
+  assert(blockTimeLt(roundCloseAt), "round is closed");
   assert(round == expectedRound, "opening belongs to another round");
   assert(nextIndex < 8, "round is full");
   assert(side <= 1, "invalid quote side");
@@ -179,6 +184,8 @@ circuit tallyOpening(acc: Tally, opening: Opening): Tally {
 
 export circuit resolveRound(openings: Vector<8, Opening>): [] {
   assert(phase == 1, "round is not full");
+  assert(blockTimeGte(roundCloseAt), "round is still open");
+  assert(blockTimeLt((roundCloseAt + (86400 as Uint<64>)) as Uint<64>), "resolution window expired");
   const tally = fold(tallyOpening, Tally { index: 0, forA: 0, forB: 0 }, openings);
   assert(tally.index == 8, "incomplete tally");
   // The winning side is the sole disclosed result of the private tally.
@@ -199,6 +206,15 @@ export circuit resolveRound(openings: Vector<8, Opening>): [] {
     sellFeeA = 700;
     sellFeeB = 300;
   }
+  phase = 2;
+}
+
+// Missing openings cannot keep the market stuck forever. After the one-day
+// resolution window, expire without disclosing a side or changing policy.
+export circuit expireRound(): [] {
+  assert(phase != 2, "round is already resolved");
+  assert(blockTimeGte((roundCloseAt + (86400 as Uint<64>)) as Uint<64>), "resolution window is still open");
+  winner = 2;
   phase = 2;
 }
 
@@ -226,6 +242,7 @@ export circuit startNextRound(): [] {
   commitments.resetToDefault();
   nextIndex = 0;
   round = (round + 1) as Uint<32>;
+  roundCloseAt = (roundCloseAt + (604800 as Uint<64>)) as Uint<64>;
   winner = 2;
   phase = 0;
 }

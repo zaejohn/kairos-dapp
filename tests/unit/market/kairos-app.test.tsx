@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 const publicState = (round: bigint): MarketSnapshot => ({
-  round, phase: 0n, positions: 0n, winner: 2n, targetA: 50n, targetB: 50n,
+  round, roundCloseAt: 2_000_000_000n, phase: 0n, positions: 0n, winner: 2n, targetA: 50n, targetB: 50n,
   economyIssued: false, quoteAColor: "", quoteBColor: "", kaiColor: "",
   reserveA: 0n, reserveB: 0n, feePool: 0n, kaiDistributed: 0n,
   buyFeeA: 300n, buyFeeB: 300n, sellFeeA: 500n, sellFeeB: 500n,
@@ -59,4 +59,13 @@ it("shows the treasury step when a resolved round has unapplied reserves", async
   render(<KairosApp initialContractAddress={address} />);
   expect(await screen.findByText("Apply the resolved allocation in Treasury before starting the next round.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Start next round" })).toBeDisabled();
+});
+
+it("shows a missed deadline and prevents new position preparation", async () => {
+  const address = "a".repeat(64);
+  readPublicMarket.mockResolvedValue({ ...publicState(1n), roundCloseAt: 1_700_000_000n });
+  render(<KairosApp initialContractAddress={address} />);
+  expect(await within(screen.getByRole("region", { name: "Market status" })).findByText("Expiry available")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Prepare private opening" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Expire missed round" })).toBeDisabled();
 });

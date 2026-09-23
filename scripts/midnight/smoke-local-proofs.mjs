@@ -17,13 +17,15 @@ const contract = new Contract({});
 const contractAddress = sampleContractAddress();
 const coinPublicKey = { bytes: new Uint8Array(32) };
 const recipient = { bytes: encodeUserAddress(sampleUserAddress()) };
-const initial = contract.initialState(createConstructorContext({}, coinPublicKey));
+const firstClose = 1_700_604_800;
+let now = firstClose - 604_800;
+const initial = contract.initialState(createConstructorContext({}, coinPublicKey), BigInt(firstClose));
 const provider = httpClientProvingProvider(
   proofServerUrl,
   new NodeZkConfigProvider("./public/zk/kairos"),
   { timeout: 120_000 },
 );
-let context = createCircuitContext(contractAddress, coinPublicKey, initial.currentContractState, {});
+let context = createCircuitContext(contractAddress, coinPublicKey, initial.currentContractState, {}, undefined, undefined, now);
 let quoteAInventory = 1_000_000n;
 const quoteBInventory = 1_000_000n;
 const proofs = [];
@@ -48,7 +50,7 @@ function settleBalances() {
     [{ tag: "unshielded", raw: decodeRawTokenType(view.quoteBColor) }, quoteBInventory],
     [{ tag: "unshielded", raw: decodeRawTokenType(view.kaiColor) }, 1_000_000n - view.kaiDistributed],
   ]);
-  context = createCircuitContext(contractAddress, coinPublicKey, state, {});
+  context = createCircuitContext(contractAddress, coinPublicKey, state, {}, undefined, undefined, now);
 }
 
 function opening(side, marker) {
@@ -74,9 +76,15 @@ try {
   for (const value of openings.slice(1)) {
     context = contract.circuits.commitPosition(context, 1n, value.side, value.salt).context;
   }
+  now = firstClose;
+  settleBalances();
   await prove("resolveRound", contract.circuits.resolveRound(context, openings));
   await prove("rebalanceTreasury", contract.circuits.rebalanceTreasury(context, 490n));
   await prove("startNextRound", contract.circuits.startNextRound(context));
+
+  now = firstClose + 604_800 + 86_400;
+  settleBalances();
+  await prove("expireRound", contract.circuits.expireRound(context));
 
   console.log(JSON.stringify({ ok: true, network: "local proof server only", proofs }, null, 2));
 } catch (error) {

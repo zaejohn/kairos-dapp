@@ -34,10 +34,13 @@ function shortError(error: unknown, fallback: string) {
   return fallback;
 }
 
-function phaseLabel(phase: bigint | undefined) {
-  if (phase === 0n) return "Open";
-  if (phase === 1n) return "Full · ready for resolution";
-  if (phase === 2n) return "Resolved";
+function phaseLabel(snapshot: MarketSnapshot | null, nowSeconds: number) {
+  if (!snapshot) return "Unavailable";
+  if (snapshot.phase === 2n) return "Resolved";
+  if (nowSeconds >= Number(snapshot.roundCloseAt) + 86_400) return "Expiry available";
+  if (nowSeconds >= Number(snapshot.roundCloseAt)) return snapshot.phase === 1n ? "Resolving" : "Closed";
+  if (snapshot.phase === 1n) return "Full · awaiting close";
+  if (snapshot.phase === 0n) return "Open";
   return "Unavailable";
 }
 
@@ -58,8 +61,16 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<PublicTxReceipt | null>(null);
   const [proofStatus, setProofStatus] = useState<"unknown" | "ready" | "unavailable">("unknown");
+  const [nowSeconds, setNowSeconds] = useState(0);
   const activeAddress = useRef(contractAddress);
   const loadGeneration = useRef(0);
+
+  useEffect(() => {
+    const update = () => setNowSeconds(Math.floor(Date.now() / 1000));
+    update();
+    const timer = window.setInterval(update, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function getClient() {
     if (!wallet) throw new AppError("WALLET_REQUIRED", "Connect Lace first.");
@@ -117,7 +128,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
   }, [initialContractAddress]);
 
   function prepare() {
-    if (!snapshot || snapshot.phase !== 0n || !isContractAddress(contractAddress)) {
+    if (!snapshot || snapshot.phase !== 0n || nowSeconds >= Number(snapshot.roundCloseAt) || !isContractAddress(contractAddress)) {
       setError("Load an open Preprod round before preparing a position.");
       return;
     }
@@ -131,6 +142,9 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
   const tradeBps = snapshot && (tradeDirection === "buy" ? (tradeSide === 0 ? snapshot.buyFeeA : snapshot.buyFeeB) : (tradeSide === 0 ? snapshot.sellFeeA : snapshot.sellFeeB));
   const displayedFee = tradeGross !== null && tradeBps !== null && tradeBps !== undefined ? tradeFee(tradeGross, tradeBps) : null;
   const allocationApplied = snapshot !== null && allocationMatchesTarget(snapshot.reserveA, snapshot.reserveB, snapshot.targetA);
+  const canCommit = snapshot?.phase === 0n && nowSeconds < Number(snapshot.roundCloseAt);
+  const canResolve = snapshot?.phase === 1n && nowSeconds >= Number(snapshot.roundCloseAt) && nowSeconds < Number(snapshot.roundCloseAt) + 86_400;
+  const canExpire = snapshot !== null && snapshot.phase !== 2n && nowSeconds >= Number(snapshot.roundCloseAt) + 86_400;
 
   return (
     <main>
@@ -162,8 +176,9 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
 
       <section className="status-strip" aria-label="Market status">
         <div><span>ROUND</span><strong>{snapshot ? snapshot.round.toString().padStart(2, "0") : "—"}</strong></div>
-        <div><span>MARKET</span><strong>{phaseLabel(snapshot?.phase)}</strong></div>
+        <div><span>MARKET</span><strong>{phaseLabel(snapshot, nowSeconds)}</strong></div>
         <div><span>COMMITMENTS</span><strong>{snapshot ? `${snapshot.positions}/8` : "—"}</strong></div>
+        <div><span>ROUND CLOSES</span><strong>{snapshot ? new Date(Number(snapshot.roundCloseAt) * 1000).toLocaleString() : "—"}</strong></div>
         <div><span>TARGET A / B</span><strong>{snapshot ? `${snapshot.targetA}% / ${snapshot.targetB}%` : "—"}</strong></div>
       </section>
 
@@ -175,7 +190,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
 
       <div className="content-grid">
         <section id="market" className="panel feature-panel">
-          <div className="panel-heading"><span className="section-index">01 / MARKET</span><span className="panel-state">{phaseLabel(snapshot?.phase)}</span></div>
+          <div className="panel-heading"><span className="section-index">01 / MARKET</span><span className="panel-state">{phaseLabel(snapshot, nowSeconds)}</span></div>
           <h2>Commit your market view</h2>
           <p>The side and salt enter a proof locally. The chain records a commitment hash, its position in the round, and transaction timing. This signal has no token deposit or payout.</p>
           <div className="side-select" role="group" aria-label="Quote-side choice">
@@ -183,12 +198,12 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
             <button type="button" className={side === 1 ? "selected" : ""} onClick={() => { setSide(1); setPrepared(null); }}>Quote B</button>
           </div>
           <div className="action-row">
-            <button type="button" className="button-primary" onClick={prepare} disabled={Boolean(busy) || snapshot?.phase !== 0n}>Prepare private opening</button>
+            <button type="button" className="button-primary" onClick={prepare} disabled={Boolean(busy) || !canCommit}>Prepare private opening</button>
             {prepared && <button type="button" className="button-secondary" onClick={() => downloadOpening(prepared)}>Download opening</button>}
           </div>
           {prepared && <div className="opening-step">
             <label><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} /> I saved my opening. Losing it prevents this position from joining resolution.</label>
-            <button type="button" className="button-primary" disabled={!saved || Boolean(busy)} onClick={() => void run("proving", async () => {
+            <button type="button" className="button-primary" disabled={!saved || Boolean(busy) || !canCommit} onClick={() => void run("proving", async () => {
               const client = await getClient();
               const result = await client.commit(contractAddress, BigInt(prepared.round), BigInt(prepared.side), openingSaltBytes(prepared));
               setReceipt(result);
@@ -315,11 +330,11 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
 
         <section className="panel resolver-panel">
           <div className="panel-heading"><span className="section-index">07 / RESOLUTION</span><span className="panel-state">Trusted resolver</span></div>
-          <h2>Resolve the complete round</h2>
-          <p>Paste a JSON array of eight opening files, in public commitment order. Verification checks each opening against its on-chain hash and publishes only the winner. The resolver learns every side.</p>
+          <h2>Resolve the weekly round</h2>
+          <p>After the public close time, paste eight opening files in commitment order. The resolver has one day to prove the winner and sees every side. If openings are missing, anyone can expire the round after that window; the allocation target stays unchanged.</p>
           <label className="field-label" htmlFor="opening-bundle">Private opening bundle</label>
           <textarea id="opening-bundle" value={bundle} onChange={(event) => setBundle(event.target.value)} placeholder="[ { version, contractAddress, round, side, salt }, ... ]" spellCheck={false} />
-          <div className="action-row"><button type="button" className="button-primary" disabled={Boolean(busy) || snapshot?.phase !== 1n || !bundle} onClick={() => void run("resolving", async () => {
+          <div className="action-row"><button type="button" className="button-primary" disabled={Boolean(busy) || !canResolve || !bundle} onClick={() => void run("resolving", async () => {
             if (!snapshot) throw new Error("no round");
             const openings = parseResolutionBundle(bundle, contractAddress, snapshot.round);
             const client = await getClient();
@@ -332,7 +347,12 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
             const client = await getClient();
             setReceipt(await client.startNextRound(contractAddress));
             await refreshAfterFinalized(contractAddress);
-          }, "The next round did not finalize.")}>{busy === "advancing" ? "Starting…" : "Start next round"}</button></div>
+          }, "The next round did not finalize.")}>{busy === "advancing" ? "Starting…" : "Start next round"}</button>
+          <button type="button" className="button-secondary" disabled={Boolean(busy) || !canExpire || !wallet} onClick={() => void run("expiring", async () => {
+            const client = await getClient();
+            setReceipt(await client.expire(contractAddress));
+            await refreshAfterFinalized(contractAddress);
+          }, "Expiry failed. The one-day resolution window may still be open; load public state and retry.")}>{busy === "expiring" ? "Expiring…" : "Expire missed round"}</button></div>
           {snapshot?.phase === 2n && !allocationApplied && <p className="fine-print">Apply the resolved allocation in Treasury before starting the next round.</p>}
         </section>
       </div>

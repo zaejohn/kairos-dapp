@@ -29,10 +29,10 @@ h1 em { color:var(--gold); font-style:normal; }
 .station:hover,.station:focus-visible { transform:translateY(-3px); background:#67441e; box-shadow:0 0 0 4px #f7b75e55,0 8px 25px #0009; }
 .station-rewards { left:4%; top:52%; } .station-settings { left:27%; top:67%; } .station-market { left:46%; top:52%; } .station-wallet { right:16%; top:12%; } .station-treasury { right:4%; top:51%; }
 .mobile-stations { display:none; }
-.status-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:#624a2c; border-top:1px solid #775737; border-bottom:1px solid #775737; }
+.status-strip { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:1px; background:#624a2c; border-top:1px solid #775737; border-bottom:1px solid #775737; }
 .status-strip > div { display:grid; gap:8px; padding:23px clamp(20px,3vw,50px); background:#21180f; }
 .status-strip span { color:var(--gold); font-size:10px; font-weight:800; letter-spacing:.19em; }
-.status-strip strong { font-size:clamp(16px,1.6vw,23px); }
+.status-strip strong { font-size:clamp(16px,1.6vw,23px); overflow-wrap:anywhere; }
 .notification { max-width:1360px; margin:24px auto 0; padding:13px 20px; border:1px solid #997047; background:#342617; line-height:1.5; overflow-wrap:anywhere; }
 .notification p { margin:4px 0; } .error-text { color:#ffc3a9; }
 .content-grid { max-width:1360px; margin:0 auto; padding:48px 24px 80px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
