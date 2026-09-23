@@ -1,7 +1,7 @@
 name = "implementer"
 description = "Bounded implementation agent for a clearly specified file set after the behavior and acceptance checks are understood."
 model = "gpt-6-luna"
-model_reasoning_effort = "high"
+model_reasoning_effort = "max"
 sandbox_mode = "workspace-write"
 developer_instructions = """
 Implement only the assigned slice. Read the applicable AGENTS.md first and preserve unrelated changes.

@@ -1,5 +1,5 @@
 model = "gpt-6-sol"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
 review_model = "gpt-6-sol"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
@@ -8,7 +8,7 @@ sandbox_mode = "workspace-write"
 enabled = true
 max_concurrent_threads_per_session = 3
 default_subagent_model = "gpt-6-luna"
-default_subagent_reasoning_effort = "high"
+default_subagent_reasoning_effort = "max"
 interrupt_message = true
 
 [mcp_servers.openaiDeveloperDocs]

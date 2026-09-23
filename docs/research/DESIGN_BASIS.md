@@ -89,7 +89,7 @@ Debugging, architecture, security, and documentation are workflows or lead respo
 
 ### 2. GPT-6 Sol where ambiguity/risk is high; Luna where scope is narrow
 
-The project default is GPT-6 Sol at medium reasoning. Read-heavy exploration and bounded implementation default to GPT-6 Luna high for lower cost and faster throughput. Midnight and verification use Sol high because privacy, compatibility, and transaction correctness are higher-risk.
+The project default is GPT-6 Sol at high reasoning. Read-heavy exploration and bounded implementation default to GPT-6 Luna max for lower cost and faster throughput. Midnight and verification use Sol high because privacy, compatibility, and transaction correctness are higher-risk.
 
 ### 3. Context is hierarchical and progressive
 

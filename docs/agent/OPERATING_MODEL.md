@@ -6,17 +6,17 @@ The repository uses one lead plus four project-scoped specialists. More standing
 
 ## Roles
 
-| Role | Default model | Writes? | Use when |
-| --- | --- | --- | --- |
-| Lead/orchestrator | GPT-6 Sol medium | Yes | Requirements, planning, integration, cross-cutting decisions, final verification |
-| `evidence_researcher` | GPT-6 Luna high | No | Codebase mapping, official docs, version/API confirmation, triage |
-| `implementer` | GPT-6 Luna high | Bounded | Clear, low/medium-risk implementation after acceptance criteria exist |
-| `midnight_specialist` | GPT-6 Sol high | Bounded | Compact, providers, wallet, proving, privacy/security-sensitive Midnight work |
-| `verifier` | GPT-6 Sol high | Test/build artifacts only | Independent falsification, review, final high-risk verification |
+| Role                  | Default model  | Writes?                   | Use when                                                                         |
+| --------------------- | -------------- | ------------------------- | -------------------------------------------------------------------------------- |
+| Lead/orchestrator     | GPT-6 Sol high | Yes                       | Requirements, planning, integration, cross-cutting decisions, final verification |
+| `evidence_researcher` | GPT-6 Luna max | No                        | Codebase mapping, official docs, version/API confirmation, triage                |
+| `implementer`         | GPT-6 Luna max | Bounded                   | Clear, low/medium-risk implementation after acceptance criteria exist            |
+| `midnight_specialist` | GPT-6 Sol high | Bounded                   | Compact, providers, wallet, proving, privacy/security-sensitive Midnight work    |
+| `verifier`            | GPT-6 Sol high | Test/build artifacts only | Independent falsification, review, final high-risk verification                  |
 
 ## Model selection
 
-Use **Sol medium** for the lead because integration and ambiguous multi-step work benefit most from stronger reasoning. Use **Luna high** for narrow exploration and ordinary bounded implementation to control cost. Escalate to **Sol high** for Midnight correctness/privacy, difficult debugging, cross-boundary architecture, or independent verification of high-risk changes.
+Use **Sol high** for the lead because integration and ambiguous multi-step work benefit most from stronger reasoning. Use **Luna max** for narrow exploration and ordinary bounded implementation to control cost. Escalate to **Sol high** for Midnight correctness/privacy, difficult debugging, cross-boundary architecture, or independent verification of high-risk changes.
 
 Do not raise reasoning/model tier merely because a task is long. Raise it when ambiguity, risk, or cross-file reasoning requires it.
 
