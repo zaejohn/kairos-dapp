@@ -31,3 +31,7 @@ Each commitment is a hash of the round, side, and random salt. The public ledger
 - **Proof or submission error:** retain the opening file, check DUST, Lace prompts, proof server health, and the current round before retrying. Inspect the public contract state before assuming a failed transaction.
 - **Round advanced before submission:** the contract rejects an opening made for an older round. Load the new round and prepare a fresh opening.
 - **Resolution fails:** provide exactly eight valid opening objects in commitment order, all for this contract and round. A missing or altered salt cannot be recovered by Kairos.
+
+## One-Minute Demo Capture Checklist
+
+After a real Preprod contract and transaction are verified, show Lace connecting on Preprod, a saved opening and commitment submission, the finalized transaction/updated public state, the four passing contract tests in the terminal, and the README's verified address. Show the hosted CI badge only if its run is actually green. Do not display an opening's side/salt, local storage password, or wallet secrets in the recording.

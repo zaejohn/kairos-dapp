@@ -18,6 +18,10 @@ Kairos is building a self-rebalancing treasury driven by private market convicti
 
 This is a **policy and signal prototype**. It does not issue assets, accept deposits, trade, move liquidity, collect fees, or pay rewards. The intended three-token economy, asymmetric contract-mediated trading route, and treasury execution are separate work. Native token transfers on Midnight can bypass any contract trading route, so a token-wide transfer tax is not claimed.
 
+## Initial Idea
+
+Kairos aims to let private weekly market conviction guide a public DeFi treasury allocation. The present contract proves a bounded aggregate signal; economic execution will require separately verified token, trading, and liquidity mechanisms.
+
 ## Privacy Model
 
 - **Public:** transaction timing, commitment order/count and hashes, round phase, winner, and allocation targets.
@@ -73,6 +77,14 @@ See [docs/USAGE.md](docs/USAGE.md).
 ## Product Proposal
 
 See [PROPOSAL.md](PROPOSAL.md). The owner's required proposal answers and organizer/category approval remain pending.
+
+## Product X Profile
+
+No product X account or profile URL has been verified. Launch copy drafts are in [docs/OUTREACH.md](docs/OUTREACH.md).
+
+## Demo Video and Screenshots
+
+The owner will record the video and screenshots after a real Preprod deployment. The [usage guide](docs/USAGE.md) contains a one-minute capture checklist. No media evidence is claimed here.
 
 ## Level 5 — User Validation
 

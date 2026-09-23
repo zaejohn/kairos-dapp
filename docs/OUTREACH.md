@@ -6,9 +6,13 @@ These are drafts for the owner to review and send after a public Preprod demo UR
 
 Kairos is testing a private market signal on Midnight Preprod. Connect Lace, choose a quote side, save your private opening, and submit one commitment. Eight openings produce a public allocation target. There are no deposits or rewards yet. Try it at [DEMO_URL]. If you want your wallet interaction counted for the test, send your Preprod address and transaction ID privately; I will confirm the chain activity before recording it.
 
-## X post (under 280 characters)
+## X launch posts (each under 280 characters)
 
-Testing Kairos on Midnight Preprod: commit a private quote-side signal, then verify the public round result. Lace + Preprod DUST needed. No deposits or rewards. Demo: [DEMO_URL] Send feedback privately.
+1. Kairos tests a private market signal on Midnight Preprod. Eight commitments produce one public quote-side allocation target. Individual sides stay off the public ledger. No deposits or rewards yet. Demo: [DEMO_URL]
+
+2. Privacy detail: each Kairos position publishes a salted commitment. A trusted resolver proves all eight openings match before the contract discloses the winner. The resolver sees every side; the public ledger does not. [DEMO_URL]
+
+3. Try Kairos on Preprod: connect Lace, choose a quote side, save your private opening, and submit one commitment. Preprod DUST needed. Send feedback privately; do not post your opening file. Demo: [DEMO_URL]
 
 ## Direct message
 
