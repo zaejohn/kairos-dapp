@@ -52,3 +52,14 @@ Integration code converts unknown third-party errors into `AppError` values with
 ## Logging
 
 Use `src/lib/logging/logger.ts`. Log event names plus small structured metadata. The logger rejects common secret-shaped keys. Do not log private Midnight witness data even if a redactor exists.
+
+## Product-specific architecture
+
+The generic boundaries above remain the implementation skeleton. Product-specific behavior, economics, privacy goals, and UI requirements live in:
+
+- `docs/product/PRODUCT.md`
+- `docs/product/ECONOMICS.md`
+- `docs/product/PRIVACY_MODEL.md`
+- `docs/product/UI.md`
+
+Treat `docs/challenge/LEVELS_1_5.md` as the authoritative challenge requirement source. Do not duplicate those requirements here.
