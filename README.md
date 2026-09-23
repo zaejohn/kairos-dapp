@@ -1,6 +1,6 @@
 # Kairos
 
-> A bounded private signal market that writes a public quote-side allocation target on Midnight Preprod.
+> A private quote-side signal market with contract-custodied trading and public treasury reserve targets for Midnight Preprod.
 
 ## Live Demo
 
@@ -14,17 +14,17 @@ No public demo URL has been verified. Run the app locally using the instructions
 
 ## What This Product Does
 
-Kairos is building a self-rebalancing treasury driven by private market conviction. The implemented Compact contract accepts eight salted quote-side commitments per round, proves that all eight openings match the public commitments, and publishes one winner. It sets a 70/30 allocation target for the winning side; a tie retains the previous target. The round can then be restarted.
+Kairos is building a self-rebalancing treasury driven by private market conviction. The Compact contract accepts eight salted quote-side commitments per round, proves that all eight openings match the public commitments, and publishes one winner. It sets a 70/30 allocation target for the winning side; a tie retains the previous target. The round can then be restarted.
 
-This is a **policy and signal prototype**. It does not issue assets, accept deposits, trade, move liquidity, collect fees, or pay rewards. The intended three-token economy, asymmetric contract-mediated trading route, and treasury execution are separate work. Native token transfers on Midnight can bypass any contract trading route, so a token-wide transfer tax is not claimed.
+The same contract now compiles with a fixed, one-time contract-custodied issuance of Quote A, Quote B, and KAI; public NIGHT/quote buy and sell routes with asymmetric basis-point fees; a fixed-supply KAI trade incentive; and a separate call that reapportions internal NIGHT redemption limits after resolution. These circuits and their accounting tests have **local evidence only**. No issuance, trade, reserve change, or finalized deployment has been observed on Preprod. The route does not provide an external exchange or guarantee redemption when a side reserve is depleted. Wallet-to-wallet transfers bypass Kairos fees, so no token-wide tax is claimed.
 
 ## Initial Idea
 
-Kairos aims to let private weekly market conviction guide a public DeFi treasury allocation. The present contract proves a bounded aggregate signal; economic execution will require separately verified token, trading, and liquidity mechanisms.
+Kairos aims to let private weekly market conviction guide a public DeFi treasury allocation. The contract proves a bounded aggregate signal and implements internal reserve policy; weekly timing and external liquidity execution remain unimplemented.
 
 ## Privacy Model
 
-- **Public:** transaction timing, commitment order/count and hashes, round phase, winner, and allocation targets.
+- **Public:** transaction timing, commitment order/count and hashes, round phase, winner, allocation targets, token colors, reserves, fees, trade side/amount/recipient, and KAI distribution total.
 - **Private from the public ledger:** the side and random salt supplied to each commitment circuit, and the eight openings supplied to the resolution circuit.
 - **Proved:** every opening matches its indexed commitment and the published winner follows the complete eight-opening tally.
 
@@ -50,7 +50,7 @@ Node.js 22, npm, Docker, Compact compiler 0.31.1, a Preprod Lace wallet for tran
 4. Run `npm run compact:compile` to create `contracts/managed/kairos` and public proving artifacts under `public/zk/kairos`.
 5. Run `npm run proof:up` and `npm run proof:status`. The dedicated Kairos server binds `127.0.0.1:6301`. If Lace is configured for local proving, it separately expects a trusted server at `localhost:6300` according to Midnight's [toolchain guide](https://docs.midnight.network/getting-started/installation); ensure that service is available before wallet transactions.
 6. Run `npm run dev`, then open `http://localhost:3000` in a browser with Lace on Preprod.
-7. Connect Lace, enter a 16+ character local storage password, and use the Settings panel to deploy a contract if no verified address is available. Save the returned public address and transaction ID.
+7. Connect Lace, enter a 16+ character local storage password, and use the Settings panel to deploy a contract if no verified address is available. Save the returned public address and transaction ID. On a deployed contract, initialize the fixed token economy once before using the trade routes.
 
 The app has no server-held wallet keys. The browser encrypts local Midnight signing-key storage using the password you supply. It is not a recovery phrase. Never send opening files to an untrusted resolver.
 

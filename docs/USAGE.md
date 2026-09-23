@@ -15,12 +15,16 @@
 5. Acknowledge that you saved it, then submit the commitment through Lace. Keep the opening even if the app shows an error until you verify whether the transaction finalized.
 6. After eight commitments, send each opening to the trusted resolver through a private channel. Each file contains its side and salt. The resolver orders all eight by public commitment index and pastes their JSON objects as one array into the resolution panel.
 7. The resolver proves the complete round. The public state then shows the winner and 70/30 allocation target. A tie preserves the previous target. The operator can start the next round.
+8. After a resolved round, use **Apply resolved allocation** to change the internal NIGHT redemption limits to the public target. Read the side reserves before trading: a quote cannot be sold if its side reserve is insufficient.
+9. If the three tokens have not yet been issued, use **Initialize fixed token economy** once. For a trade, choose Buy or Sell, a quote side, and a gross whole-number amount in atomic units. Review the public fee and net output before submitting through Lace. A trade may also distribute KAI while fixed inventory remains.
 
-The current product has no token trades, deposits, yield, or rewards. The allocation target is a public policy value; no liquidity moves automatically.
+The economic circuits compile and pass local accounting tests, but no issuance or trade has been confirmed on Preprod yet. The treasury call changes internal redemption limits, not external liquidity. There is no yield, market-signal reward, or KAI redemption promise. Trading uses public unshielded assets; direct transfers outside Kairos do not pay its fee.
 
 ## What Gets Proved (and What Stays Private)
 
 Each commitment is a hash of the round, side, and random salt. The public ledger stores the hash and its order. The resolution proof checks all eight openings against those hashes and publishes only the winning side. The individual side is hidden from public ledger data, but the trusted resolver and the proof server it uses see every opening. Public transaction timing and a small group may reveal clues. Anyone can submit multiple commitments; there is no unique-user proof.
+
+Token issuance, trade side, gross amount, fee, payout address, reserve values, and KAI distribution total are public. A trade does not hide its buyer or seller's economic action.
 
 ## Troubleshooting
 
@@ -31,7 +35,8 @@ Each commitment is a hash of the round, side, and random salt. The public ledger
 - **Proof or submission error:** retain the opening file, check DUST, Lace prompts, proof server health, and the current round before retrying. Inspect the public contract state before assuming a failed transaction.
 - **Round advanced before submission:** the contract rejects an opening made for an older round. Load the new round and prepare a fresh opening.
 - **Resolution fails:** provide exactly eight valid opening objects in commitment order, all for this contract and round. A missing or altered salt cannot be recovered by Kairos.
+- **Trade fails:** check that genesis was finalized, that your Lace wallet has the input asset and DUST, that quote inventory covers a buy, or that the selected side reserve covers a sell. Refresh the public state after any transaction before retrying.
 
 ## One-Minute Demo Capture Checklist
 
-After a real Preprod contract and transaction are verified, show Lace connecting on Preprod, a saved opening and commitment submission, the finalized transaction/updated public state, the four passing contract tests in the terminal, and the README's verified address. Show the hosted CI badge only if its run is actually green. Do not display an opening's side/salt, local storage password, or wallet secrets in the recording.
+After a real Preprod contract and transaction are verified, show Lace connecting on Preprod, a saved opening and commitment submission, the finalized transaction/updated public state, the passing contract tests in the terminal, and the README's verified address. Show a trade or reserve call only after its own finalized transaction is verified. Show the hosted CI badge only if its run is actually green. Do not display an opening's side/salt, local storage password, or wallet secrets in the recording.
