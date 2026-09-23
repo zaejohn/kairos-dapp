@@ -1,0 +1,17 @@
+# Normalize line endings so the repository is stable across Windows, Linux and
+# CI runners. The Compact compiler and the generated artifacts are line-ending
+# sensitive in places, and a Windows checkout must not rewrite them.
+* text=auto eol=lf
+
+*.compact text eol=lf
+*.zkir   text eol=lf
+
+# Compiled contract keys are binary.
+*.prover   binary
+*.verifier binary
+*.bzkir    binary
+
+*.png binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
