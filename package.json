@@ -1,0 +1,58 @@
+{
+  "name": "codex-midnight-boilerplate",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:contracts": "vitest run --config vitest.contract.config.ts",
+    "test:e2e": "playwright test",
+    "verify:fast": "npm run lint && npm run typecheck && npm run test",
+    "verify": "npm run verify:fast && npm run build",
+    "proof:up": "docker compose -f infra/midnight/proof-server.yml up -d",
+    "proof:down": "docker compose -f infra/midnight/proof-server.yml down",
+    "proof:logs": "docker compose -f infra/midnight/proof-server.yml logs -f proof-server",
+    "proof:status": "node scripts/midnight/check-proof-server.mjs",
+    "compact:version": "compact compile --version",
+    "compact:compile": "node scripts/midnight/compile-contracts.mjs",
+    "agent:doctor": "node scripts/agent/doctor.mjs",
+    "clean": "node scripts/clean.mjs"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/dapp-connector-api": "4.0.1",
+    "@midnight-ntwrk/midnight-js": "4.1.1",
+    "next": "16.3.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/testkit-js": "4.1.1",
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/jest-dom": "^6.9.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "5.0.1",
+    "eslint": "10.11.0",
+    "eslint-config-next": "16.3.6",
+    "jsdom": "^27.0.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  },
+  "overrides": {
+    "@midnight-ntwrk/compact-runtime": "0.16.0"
+  }
+}

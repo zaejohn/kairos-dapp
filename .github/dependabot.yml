@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "@playwright/test"
+    ignore:
+      # Upgrade Midnight only as a tested compatibility set.
+      - dependency-name: "@midnight-ntwrk/*"
+      # Next security upgrades should be reviewed deliberately and quickly.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]

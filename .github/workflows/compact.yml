@@ -1,0 +1,39 @@
+name: Compact Compile
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "scripts/midnight/compile-contracts.mjs"
+      - "docs/midnight/**"
+      - "package.json"
+      - ".github/workflows/compact.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Install Compact devtools 0.5.1
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/midnightntwrk/compact/releases/download/compact-v0.5.1/compact-installer.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Install compatible Compact toolchain
+        run: |
+          compact update 0.31
+          compact compile --version
+      - name: Compile contracts
+        run: npm run compact:compile
+      - name: Verify contract source tests
+        run: |
+          npm install --no-audit --no-fund
+          npm run test:contracts

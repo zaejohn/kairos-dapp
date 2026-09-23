@@ -1,0 +1,38 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next
+/out
+
+# tests/reports
+/coverage
+/playwright-report
+/test-results
+
+# local env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+
+# logs
+*.log
+npm-debug.log*
+
+# generated Midnight/Compact artifacts
+/contracts/managed
+
+# Codex local logs/state that should not be shared
+/.codex-log
+
+# misc
+*.tsbuildinfo
