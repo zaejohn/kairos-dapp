@@ -17,18 +17,41 @@ Private conviction → Market resolution → Treasury reallocation
 
 ## Contract Address
 
-**Not yet deployed.** KAIROS has not been deployed to a public network, so there
-is no address to report — and no address is invented here.
+**Deployed to Midnight Preprod.**
 
-Deploying requires a browser wallet (1AM) holding testnet tNIGHT plus DUST for
-fees. Everything else is in place: the contract compiles, all seven circuits
-produce proving keys, and the test suite runs against the real compiled
-artifacts. See [Deployment](#deployment) for the exact steps and what to expect.
+```
+89001d3f0ddb1b1d9e30fb1fa34f3c26658f5ba20bb6c25870e18dac5bbba8e4
+```
 
-Once deployed, set the address and the app will pick it up:
+| | |
+|---|---|
+| Network | Preprod |
+| Deployment transaction | `de964c812bb2a35e089d303fe243e24872ea68f4b3e9384bb0f775574e11f134` |
+| Block | `2671615` |
+| Format | 64-character hex — **not** bech32 |
+
+**On the address format.** Midnight's SDK represents a contract address as the
+64-character hex string (`ContractAddress` is `string`, and
+`sampleContractAddress()` returns hex), which is exactly what the explorer
+reports as the *contract identifier*. No conversion to `mn1…` is needed or
+correct — the `mn1…` forms are user/account addresses, not contract addresses.
+
+Verify it yourself against the chain:
 
 ```sh
-NEXT_PUBLIC_KAIROS_CONTRACT_ADDRESS=<address> npm run build
+node scripts/verify-contract.mjs 89001d3f0ddb1b1d9e30fb1fa34f3c26658f5ba20bb6c25870e18dac5bbba8e4
+```
+
+That reads the contract's public state from the Preprod indexer and decodes it
+with this project's own ledger decoder, so it confirms the deployed ledger is
+genuinely KAIROS and not merely that some address exists.
+
+To point the app at it:
+
+```sh
+cp .env.example .env.local
+# then set:
+NEXT_PUBLIC_KAIROS_CONTRACT_ADDRESS=89001d3f0ddb1b1d9e30fb1fa34f3c26658f5ba20bb6c25870e18dac5bbba8e4
 ```
 
 ---

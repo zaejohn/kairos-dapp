@@ -27,6 +27,20 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// Next.js loads .env.local automatically; plain Node does not. Without this the
+// script reports "address unset" for a correctly configured project — a false
+// negative that would send you chasing a problem that does not exist.
+for (const file of ['.env.local', '.env']) {
+  const path = join(root, file);
+  if (existsSync(path)) {
+    try {
+      process.loadEnvFile(path);
+    } catch {
+      // Older Node, or a malformed file — fall through to the real environment.
+    }
+  }
+}
 const managed = join(root, 'managed', 'kairos');
 const publicZk = join(root, 'public', 'zk');
 
@@ -177,7 +191,13 @@ if (!address) {
 console.log('');
 if (failures === 0) {
   console.log(`Preflight passed${warnings ? ` with ${warnings} warning(s)` : ''}.`);
-  console.log('Ready to deploy from the browser: open the app, connect 1AM, click Deploy.');
+  if (address) {
+    console.log('A contract address is configured.');
+    console.log('Next: open the app, connect 1AM, and exercise the market flow.');
+    console.log(`Confirm proving with: node scripts/verify-contract.mjs ${address}`);
+  } else {
+    console.log('Ready to deploy from the browser: open the app, connect 1AM, click Deploy.');
+  }
   process.exit(0);
 } else {
   console.error(`Preflight FAILED with ${failures} error(s). Fix those before deploying.`);
