@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A new push to the same ref makes the previous run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned to the version in the official Midnight support matrix. A bare
+  # `compact update` would pull the newest release, which can target a ledger
+  # version that is not yet deployed on the public networks.
+  COMPACT_TOOLCHAIN_VERSION: 0.31.1
+
+jobs:
+  build:
+    name: Compile, test and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Compact toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Pin Compact compiler version
+        run: |
+          compact update "$COMPACT_TOOLCHAIN_VERSION"
+          compact --version
+          compact compile --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile the KAIROS contract
+        run: npm run compile
+
+      - name: Verify generated artifacts
+        run: |
+          set -euo pipefail
+
+          # The circuits the dApp and the tests both depend on.
+          circuits="submitPosition closeMarket revealPosition settleMarket finalizeMarket startNextMarket flip"
+
+          for circuit in $circuits; do
+            for artifact in "keys/$circuit.prover" "keys/$circuit.verifier" "zkir/$circuit.zkir"; do
+              path="managed/kairos/$artifact"
+              if [ ! -s "$path" ]; then
+                echo "::error::missing or empty artifact: $path"
+                exit 1
+              fi
+            done
+          done
+
+          for required in \
+            managed/kairos/contract/index.js \
+            managed/kairos/contract/index.d.ts \
+            managed/kairos/compiler/contract-info.json
+          do
+            if [ ! -s "$required" ]; then
+              echo "::error::missing or empty artifact: $required"
+              exit 1
+            fi
+          done
+
+          echo "Compiler provenance:"
+          cat managed/kairos/compiler/contract-info.json | head -5
+
+      - name: Verify the contract still compiles from source
+        run: |
+          # Guard against committed artifacts drifting from the source contract.
+          # A clean recompile must reproduce byte-identical generated artifacts.
+          cp -r managed/kairos /tmp/managed-before
+          npm run compile
+          if ! diff -r /tmp/managed-before managed/kairos; then
+            echo "::error::committed artifacts differ from a fresh compile; run 'npm run compile' and commit the result"
+            exit 1
+          fi
+          echo "Committed artifacts match a fresh compile."
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run contract tests
+        run: npm test
+
+      - name: Sync ZK assets
+        run: npm run zk:sync
+
+      - name: Build the Next.js application
+        run: npm run build
