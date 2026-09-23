@@ -8,12 +8,15 @@ conviction.
 
 ## What You Need
 
-1. **A browser with the Lace wallet installed.** KAIROS talks to Lace through
-   the Midnight DApp Connector. Lace is the supported wallet.
-2. **Lace switched to the right network.** This build targets **Preprod** by
-   default. In Lace, set the network to Preprod before connecting — if the
-   wallet is on a different network, KAIROS will refuse to connect and tell you
-   which network it found.
+1. **A browser with the 1AM wallet installed.** KAIROS talks to
+   [1AM](https://1am.xyz/) through the Midnight DApp Connector. 1AM is
+   Midnight's own wallet and is the supported one here; it injects itself at
+   `window.midnight['1am']`, and KAIROS prefers it when several wallets are
+   installed at once.
+2. **1AM switched to the right network.** This build targets **Preprod** by
+   default. Set the network in 1AM before connecting — if the wallet is on a
+   different network, KAIROS will refuse to connect and tell you which network
+   it found.
 3. **Some testnet tNIGHT, plus DUST for fees.** Get tNIGHT from the Preprod
    faucet. DUST is generated from tNIGHT over time; without it, transactions
    cannot pay fees. Mainnet has no faucet, so use Preprod for testing.
@@ -27,8 +30,10 @@ conviction.
    The first run downloads public proving parameters (a few hundred MB, one
    time only). Leave the terminal open — the server needs to keep running.
 
-   In Lace, go to **Settings → Midnight** and choose **Local
-   (http://localhost:6300)**.
+   KAIROS proves against this local server on every wallet, including 1AM. 1AM
+   *can* prove in-tab instead, but using your own proof server keeps the privacy
+   guarantee uniform: whatever wallet is connected, the witness data behind your
+   position never reaches a third party.
 
 ---
 
@@ -36,11 +41,14 @@ conviction.
 
 ### 1. Connect your wallet
 
-Open the app and click **Connect Lace**. Lace will ask you to approve the
+Open the app and click **Connect 1AM**. 1AM will ask you to approve the
 connection.
 
+Approve it promptly — the request has to come directly from your click, and a
+pop-up that the browser treats as unsolicited will be blocked.
+
 If the button reports a network mismatch, your wallet is on a different network
-than the app. Switch networks in Lace and reconnect.
+than the app. Switch networks in 1AM and reconnect.
 
 ### 2. Look at the treasury
 
@@ -197,18 +205,19 @@ of your position during the open phase — not the fact that you took part.
 ## Troubleshooting
 
 **"No compatible Midnight wallet detected."**
-Lace is not installed, or it has not finished injecting into the page. Install
-Lace and reload. If it is installed, reload once — extensions inject
-asynchronously and a cold page load can occasionally beat them to it.
+1AM is not installed, or it has not finished injecting into the page. Install
+1AM from <https://1am.xyz/> and reload. If it is installed, reload once —
+extensions inject asynchronously and a cold page load can occasionally beat them
+to it.
 
 **"Network mismatch: this app targets preprod but the wallet is on preview."**
-Your wallet and the app disagree about which network they are on. Open Lace,
+Your wallet and the app disagree about which network they are on. Open 1AM,
 switch to the network named in the message, and reconnect.
 
 **The proof takes a very long time, or "Generating a zero-knowledge proof" never finishes.**
 Check that the proof server is running: `curl http://localhost:6300/health`.
-Also check Lace is set to **Settings → Midnight → Local**. The first proof after
-starting the server is slow because the proving parameters are still being
+Also confirm the server is reachable at the URL in the message. The first proof
+after starting it is slow because the proving parameters are still being
 loaded; later ones are much faster.
 
 **"KAIROS: position already submitted for this market."**

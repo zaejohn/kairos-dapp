@@ -20,7 +20,7 @@ Private conviction → Market resolution → Treasury reallocation
 **Not yet deployed.** KAIROS has not been deployed to a public network, so there
 is no address to report — and no address is invented here.
 
-Deploying requires a browser wallet (Lace) holding testnet tNIGHT plus DUST for
+Deploying requires a browser wallet (1AM) holding testnet tNIGHT plus DUST for
 fees. Everything else is in place: the contract compiles, all seven circuits
 produce proving keys, and the test suite runs against the real compiled
 artifacts. See [Deployment](#deployment) for the exact steps and what to expect.
@@ -132,7 +132,7 @@ it. **Unrevealed positions are not counted.**
 CSS v4. One full-stack Next.js app; no separate backend service.
 
 **Midnight** — Compact 0.23 (`compact compile` toolchain 0.31.1), midnight-js
-4.1.1, Midnight DApp Connector 4.0.1, Lace wallet, `midnightntwrk/proof-server`
+4.1.1, Midnight DApp Connector 4.0.1, 1AM wallet, `midnightntwrk/proof-server`
 8.1.0.
 
 Package versions are pinned to the official support matrix, **not** npm's
@@ -148,8 +148,8 @@ actually reports. See `managed/kairos/compiler/contract-info.json`.
 - **Node.js 22**
 - **Docker**, for the proof server
 - **Compact toolchain 0.31.1**
-- **Lace wallet**, for deployment and interaction
-- **Lace set to a local proof server** (Settings → Midnight → Local)
+- **1AM wallet** (<https://1am.xyz/>), for deployment and interaction
+- **A local proof server**, which KAIROS uses for proving on every wallet
 
 > The Compact compiler ships Linux and macOS binaries only. On Windows, run the
 > compile steps inside WSL2.
@@ -185,7 +185,7 @@ npm run zk:sync
 npm run dev
 ```
 
-Then open <http://localhost:3000> and connect Lace.
+Then open <http://localhost:3000> and connect 1AM.
 
 ### Scripts
 
@@ -279,13 +279,13 @@ Coverage:
 
 ## Deployment
 
-Deployment must be done from a browser, because Lace's DApp Connector is the
+Deployment must be done from a browser, because 1AM's DApp Connector is the
 supported path and it holds the keys.
 
-1. Start the proof server (above) and set Lace to **Settings → Midnight → Local**.
-2. Get testnet tNIGHT from the Preprod faucet and wait for DUST to accumulate —
-   without DUST, the deploy transaction cannot pay fees.
-3. Run the app, connect Lace, and click **Deploy KAIROS contract**.
+1. Start the proof server (above).
+2. Set 1AM to Preprod and get testnet tNIGHT from the Preprod faucet, then wait
+   for DUST to accumulate — without DUST, the deploy transaction cannot pay fees.
+3. Run the app, connect 1AM, and click **Deploy KAIROS contract**.
 4. Wait for the proof and confirmation. The new address is shown in the footer.
 5. Set `NEXT_PUBLIC_KAIROS_CONTRACT_ADDRESS` to that address and rebuild.
 

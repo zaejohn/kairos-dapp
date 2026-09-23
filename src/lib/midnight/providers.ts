@@ -133,9 +133,10 @@ export type KairosProviders = MidnightProviders<
 /**
  * Build the provider set for a connected wallet.
  *
- * The proof server is always the local one. Lace only supports a local proof
- * server, and routing private witness data through a remote prover would defeat
- * the privacy model — the witness values are what must never leave the machine.
+ * The proof server is always the local one. 1AM can also prove in-tab via
+ * `getProvingProvider`, but routing private witness data through the local proof
+ * server keeps the guarantee explicit — the witness values are what must never
+ * leave the machine.
  */
 export const buildKairosProviders = (
   wallet: ConnectedWallet,

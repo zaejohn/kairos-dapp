@@ -144,11 +144,12 @@ The 44 contract tests run the real circuits through the Compact runtime.
 1. **Deployment.** The contract must be deployed from a funded wallet. Every
    other prerequisite is in place; this is the one step that needs a wallet
    holding testnet tNIGHT plus DUST for fees, and it must be done from a browser
-   because Lace's DApp Connector is the supported path.
+   because the 1AM DApp Connector is the supported path.
 2. **A proof server.** Proof generation runs locally at `http://localhost:6300`
-   (`midnightntwrk/proof-server:8.1.0`). This is the supported configuration —
-   Lace only offers a local proof server — and it is also the right one
-   architecturally, since witness data must not be sent to a third party.
+   (`midnightntwrk/proof-server:8.1.0`). 1AM can also prove in-tab via
+   `getProvingProvider`, but KAIROS uses the local proof server on every wallet
+   so the privacy guarantee is uniform: witness data never reaches a third
+   party, whichever wallet is connected.
 3. **An indexer.** Public state is read from the network indexer at
    `/api/v4/graphql`. No additional infrastructure is needed.
 

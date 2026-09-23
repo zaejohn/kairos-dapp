@@ -53,7 +53,7 @@ export default function Page() {
 
         {kairos.walletStatus !== 'connected' && (
           <Notice>
-            Connect Lace to read the treasury and act on the current market. Proving runs
+            Connect 1AM to read the treasury and act on the current market. Proving runs
             against your local proof server at{' '}
             <span className="tabular">{config.proofServerUri}</span>.
           </Notice>

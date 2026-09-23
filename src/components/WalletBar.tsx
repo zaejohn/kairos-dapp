@@ -29,7 +29,9 @@ export const WalletBar = ({
             className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-success)]"
             aria-hidden
           />
-          Lace
+          {/* The connector's own name, so the label stays correct whether the
+              user is on 1AM or another compatible wallet. */}
+          {wallet.name}
         </Chip>
         <span
           className="tabular hidden text-xs text-[var(--color-ink-muted)] sm:inline"
@@ -43,7 +45,7 @@ export const WalletBar = ({
       </>
     ) : (
       <Button variant="primary" onClick={onConnect} disabled={status === 'connecting'}>
-        {status === 'connecting' ? 'Connecting…' : 'Connect Lace'}
+        {status === 'connecting' ? 'Connecting…' : 'Connect 1AM'}
       </Button>
     )}
   </div>

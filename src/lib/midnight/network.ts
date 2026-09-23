@@ -5,9 +5,9 @@
  * networks-and-environments reference. Note the indexer path is `/api/v4/graphql`
  * — older examples in the wild still use the retired v3 path.
  *
- * Proof generation always runs against a local proof server. The supported
- * configuration is `http://localhost:6300`, which is also where Lace looks for
- * it under Settings -> Midnight -> Local.
+ * Proof generation always runs against a local proof server at
+ * `http://localhost:6300`. KAIROS proves locally rather than delegating to the
+ * wallet's own prover so that witness data never leaves the user's machine.
  */
 
 export type NetworkId = 'undeployed' | 'preview' | 'preprod';
