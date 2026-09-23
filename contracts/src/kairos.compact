@@ -1,0 +1,91 @@
+pragma language_version 0.23;
+import CompactStandardLibrary;
+
+// Public: round, phase, commitment hashes/count, winner, and treasury targets.
+// Private circuit inputs: each side and random salt. The resolver must obtain
+// all eight openings; its proof server can see them. This contract does not
+// authenticate unique people or escrow a financial position.
+export struct Opening {
+  side: Uint<8>;
+  salt: Bytes<32>;
+}
+
+export struct Tally {
+  index: Uint<8>;
+  forA: Uint<8>;
+  forB: Uint<8>;
+}
+
+export ledger round: Uint<32>;
+export ledger commitments: Map<Uint<8>, Bytes<32>>;
+export ledger nextIndex: Uint<8>;
+export ledger phase: Uint<8>; // 0 open, 1 full, 2 resolved
+export ledger winner: Uint<8>; // 0 quote A, 1 quote B, 2 none/tie
+export ledger targetA: Uint<8>; // percentage policy, not executed liquidity
+export ledger targetB: Uint<8>;
+
+constructor() {
+  round = 1;
+  nextIndex = 0;
+  phase = 0;
+  winner = 2;
+  targetA = 50;
+  targetB = 50;
+}
+
+circuit commitment(currentRound: Uint<32>, side: Uint<8>, salt: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "kairos:position:v1"),
+    (currentRound as Field) as Bytes<32>,
+    (side as Field) as Bytes<32>,
+    salt
+  ]);
+}
+
+export circuit commitPosition(expectedRound: Uint<32>, side: Uint<8>, salt: Bytes<32>): [] {
+  assert(phase == 0, "round is not open");
+  assert(round == expectedRound, "opening belongs to another round");
+  assert(nextIndex < 8, "round is full");
+  assert(side <= 1, "invalid quote side");
+  commitments.insert(nextIndex, disclose(commitment(round, side, salt)));
+  nextIndex = (nextIndex + 1) as Uint<8>;
+  if (nextIndex == 8) {
+    phase = 1;
+  }
+}
+
+circuit tallyOpening(acc: Tally, opening: Opening): Tally {
+  assert(opening.side <= 1, "invalid quote side");
+  assert(commitments.lookup(acc.index) == commitment(round, opening.side, opening.salt), "opening does not match commitment");
+  return Tally {
+    index: (acc.index + 1) as Uint<8>,
+    forA: (acc.forA + (opening.side == 0 ? 1 : 0)) as Uint<8>,
+    forB: (acc.forB + (opening.side == 1 ? 1 : 0)) as Uint<8>
+  };
+}
+
+export circuit resolveRound(openings: Vector<8, Opening>): [] {
+  assert(phase == 1, "round is not full");
+  const tally = fold(tallyOpening, Tally { index: 0, forA: 0, forB: 0 }, openings);
+  assert(tally.index == 8, "incomplete tally");
+  // The winning side is the sole disclosed result of the private tally.
+  const outcome = disclose(tally.forA > tally.forB ? 0 : tally.forB > tally.forA ? 1 : 2);
+  winner = outcome;
+  if (outcome == 0) {
+    targetA = 70;
+    targetB = 30;
+  } else if (outcome == 1) {
+    targetA = 30;
+    targetB = 70;
+  }
+  phase = 2;
+}
+
+export circuit startNextRound(): [] {
+  assert(phase == 2, "current round is unresolved");
+  commitments.resetToDefault();
+  nextIndex = 0;
+  round = (round + 1) as Uint<32>;
+  winner = 2;
+  phase = 0;
+}

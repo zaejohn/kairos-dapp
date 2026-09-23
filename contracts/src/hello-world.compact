@@ -1,9 +1,0 @@
-pragma language_version 0.23;
-
-// DEMO ONLY: this stores the supplied message in public ledger state.
-// Replace this contract with project-specific behavior and privacy tests.
-export ledger message: Opaque<"string">;
-
-export circuit storeMessage(newMessage: Opaque<"string">): [] {
-  message = disclose(newMessage);
-}

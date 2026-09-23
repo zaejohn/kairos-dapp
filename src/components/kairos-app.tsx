@@ -1,0 +1,290 @@
+"use client";
+
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
+import type { LaceConnection } from "@/lib/midnight/wallet";
+import { connectLace, shortenAddress } from "@/lib/midnight/wallet";
+import { createOpening, isContractAddress, openingSaltBytes, parseResolutionBundle, type SavedOpening } from "@/lib/market/openings";
+import type { MarketSnapshot, PublicTxReceipt } from "@/lib/midnight/market-client";
+import { AppError } from "@/lib/errors/app-error";
+
+const stations = [
+  { label: "Rewards", target: "rewards", className: "station-rewards" },
+  { label: "Settings", target: "settings", className: "station-settings" },
+  { label: "Market", target: "market", className: "station-market" },
+  { label: "Wallet", target: "wallet", className: "station-wallet" },
+  { label: "Treasury", target: "treasury", className: "station-treasury" },
+] as const;
+
+function downloadOpening(opening: SavedOpening) {
+  const blob = new Blob([JSON.stringify(opening, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `kairos-opening-round-${opening.round}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function shortError(error: unknown, fallback: string) {
+  if (error instanceof AppError) return error.message;
+  if (error instanceof Error && /^(Opening|Every opening|Exactly eight|A valid Preprod)/.test(error.message)) return error.message;
+  return fallback;
+}
+
+function phaseLabel(phase: bigint | undefined) {
+  if (phase === 0n) return "Open";
+  if (phase === 1n) return "Full · ready for resolution";
+  if (phase === 2n) return "Resolved";
+  return "Unavailable";
+}
+
+export function KairosApp({ initialContractAddress }: { initialContractAddress: string }) {
+  const [wallet, setWallet] = useState<LaceConnection | null>(null);
+  const [contractAddress, setContractAddress] = useState(initialContractAddress);
+  const [password, setPassword] = useState("");
+  const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
+  const [side, setSide] = useState<0 | 1>(0);
+  const [prepared, setPrepared] = useState<SavedOpening | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [bundle, setBundle] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<PublicTxReceipt | null>(null);
+  const [proofStatus, setProofStatus] = useState<"unknown" | "ready" | "unavailable">("unknown");
+  const activeAddress = useRef(contractAddress);
+  const loadGeneration = useRef(0);
+
+  async function getClient() {
+    if (!wallet) throw new AppError("WALLET_REQUIRED", "Connect Lace first.");
+    const { createMarketClient } = await import("@/lib/midnight/market-client");
+    return createMarketClient(wallet.api, wallet.shieldedAddress, password);
+  }
+
+  async function run(label: string, work: () => Promise<void>, failure: string) {
+    setBusy(label);
+    setError(null);
+    setMessage(null);
+    try {
+      await work();
+    } catch (cause) {
+      setError(shortError(cause, failure));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function refresh(address = contractAddress) {
+    if (!isContractAddress(address)) {
+      setSnapshot(null);
+      throw new Error("A valid Preprod contract address is required.");
+    }
+    const generation = ++loadGeneration.current;
+    const { readPublicMarket } = await import("@/lib/midnight/market-client");
+    const next = await readPublicMarket(address);
+    if (generation !== loadGeneration.current || activeAddress.current !== address) return;
+    setSnapshot(next);
+    setPrepared((current) => current?.round === Number(next.round) && next.phase === 0n ? current : null);
+    setSaved(false);
+  }
+
+  async function refreshAfterFinalized(address: string) {
+    try {
+      await refresh(address);
+    } catch {
+      setMessage("Transaction finalized, but the indexer has not returned the latest state. Load public state again shortly.");
+    }
+  }
+
+  useEffect(() => {
+    if (isContractAddress(initialContractAddress)) {
+      const generation = ++loadGeneration.current;
+      void import("@/lib/midnight/market-client")
+        .then(({ readPublicMarket }) => readPublicMarket(initialContractAddress))
+        .then((next) => {
+          if (generation === loadGeneration.current && activeAddress.current === initialContractAddress) setSnapshot(next);
+        })
+        .catch(() => {
+          if (generation === loadGeneration.current && activeAddress.current === initialContractAddress) setSnapshot(null);
+        });
+    }
+  }, [initialContractAddress]);
+
+  function prepare() {
+    if (!snapshot || snapshot.phase !== 0n || !isContractAddress(contractAddress)) {
+      setError("Load an open Preprod round before preparing a position.");
+      return;
+    }
+    setPrepared(createOpening(contractAddress, Number(snapshot.round), side));
+    setSaved(false);
+    setError(null);
+    setMessage("Download the opening and keep it private. The resolver will need it later.");
+  }
+
+  return (
+    <main>
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="Kairos home">KAIROS<span> / PREPROD</span></a>
+        <div className="topbar-right"><span className="network-pill">MIDNIGHT PREPROD</span><a href="#wallet">{wallet ? shortenAddress(wallet.shieldedAddress, 5) : "Connect wallet"}</a></div>
+      </header>
+
+      <section id="top" className="hero-shell">
+        <div className="hero-copy">
+          <p className="eyebrow">THE NEXT ALLOCATION BEGINS IN PRIVATE</p>
+          <h1>Market conviction.<br /><em>Public direction.</em></h1>
+          <p>Kairos is a bounded private signal market for a future self-rebalancing treasury. Eight salted positions produce one public winner and an auditable allocation target.</p>
+          <a className="primary-link" href="#market">Enter the market <span aria-hidden>↗</span></a>
+        </div>
+        <div className="scene" aria-label="Navigate Kairos stations">
+          <Image src="/reference/kairos-workshop.png" alt="Illustrated workshop with interactive market, rewards, wallet, treasury, and settings stations" fill priority sizes="(max-width: 900px) 100vw, 1200px" />
+          <div className="scene-shade" />
+          {stations.map((station) => (
+            <a key={station.target} className={`station ${station.className}`} href={`#${station.target}`} aria-label={`Open ${station.label}`}>
+              <span>{station.label}</span><span aria-hidden>↗</span>
+            </a>
+          ))}
+        </div>
+        <nav className="mobile-stations" aria-label="Product stations">
+          {stations.map((station) => <a key={station.target} href={`#${station.target}`}>{station.label}<span aria-hidden>↗</span></a>)}
+        </nav>
+      </section>
+
+      <section className="status-strip" aria-label="Market status">
+        <div><span>ROUND</span><strong>{snapshot ? snapshot.round.toString().padStart(2, "0") : "—"}</strong></div>
+        <div><span>MARKET</span><strong>{phaseLabel(snapshot?.phase)}</strong></div>
+        <div><span>COMMITMENTS</span><strong>{snapshot ? `${snapshot.positions}/8` : "—"}</strong></div>
+        <div><span>TARGET A / B</span><strong>{snapshot ? `${snapshot.targetA}% / ${snapshot.targetB}%` : "—"}</strong></div>
+      </section>
+
+      {(error || message || receipt) && <div className="notification" role={error ? "alert" : "status"}>
+        {error && <p className="error-text">{error}</p>}
+        {message && <p>{message}</p>}
+        {receipt && <p>Last finalized transaction in block {receipt.blockHeight}: <code>{receipt.txId}</code></p>}
+      </div>}
+
+      <div className="content-grid">
+        <section id="market" className="panel feature-panel">
+          <div className="panel-heading"><span className="section-index">01 / MARKET</span><span className="panel-state">{phaseLabel(snapshot?.phase)}</span></div>
+          <h2>Commit your market view</h2>
+          <p>The side and salt enter a proof locally. The chain records a commitment hash, its position in the round, and transaction timing. This signal has no token deposit or payout.</p>
+          <div className="side-select" role="group" aria-label="Quote-side choice">
+            <button type="button" className={side === 0 ? "selected" : ""} onClick={() => { setSide(0); setPrepared(null); }}>Quote A</button>
+            <button type="button" className={side === 1 ? "selected" : ""} onClick={() => { setSide(1); setPrepared(null); }}>Quote B</button>
+          </div>
+          <div className="action-row">
+            <button type="button" className="button-primary" onClick={prepare} disabled={Boolean(busy) || snapshot?.phase !== 0n}>Prepare private opening</button>
+            {prepared && <button type="button" className="button-secondary" onClick={() => downloadOpening(prepared)}>Download opening</button>}
+          </div>
+          {prepared && <div className="opening-step">
+            <label><input type="checkbox" checked={saved} onChange={(event) => setSaved(event.target.checked)} /> I saved my opening. Losing it prevents this position from joining resolution.</label>
+            <button type="button" className="button-primary" disabled={!saved || Boolean(busy)} onClick={() => void run("proving", async () => {
+              const client = await getClient();
+              const result = await client.commit(contractAddress, BigInt(prepared.round), BigInt(prepared.side), openingSaltBytes(prepared));
+              setReceipt(result);
+              setPrepared(null);
+              setSaved(false);
+              await refreshAfterFinalized(contractAddress);
+            }, "Position submission failed. Check Lace, local proof server, DUST, and the round; keep your opening for retry.")}>{busy === "proving" ? "Proving and finalizing…" : "Submit commitment"}</button>
+          </div>}
+          <p className="fine-print">Eight commitments fill a round. One trusted resolver needs all eight opening files; it and its proof server see their contents.</p>
+        </section>
+
+        <section id="wallet" className="panel wallet-panel">
+          <div className="panel-heading"><span className="section-index">02 / WALLET</span><span className="panel-state">{wallet ? "Connected" : "Disconnected"}</span></div>
+          <h2>Lace on Preprod</h2>
+          <p>{wallet ? shortenAddress(wallet.shieldedAddress) : "Connect Lace to submit a proof or deploy a contract. Public market state can be read without a wallet."}</p>
+          <div className="action-row"><button type="button" className="button-secondary" disabled={Boolean(busy)} onClick={() => {
+            if (wallet) {
+              setWallet(null);
+              setPassword("");
+              setPrepared(null);
+              setSaved(false);
+              setBundle("");
+              setReceipt(null);
+              setMessage("Local session and private inputs cleared. Revoke site access in Lace if needed.");
+              return;
+            }
+            void run("connecting", async () => { setWallet(await connectLace("preprod")); setMessage("Lace connected to Midnight Preprod."); }, "Could not connect Lace. Check installation, permission, and selected network.");
+          }}>{busy === "connecting" ? "Connecting…" : wallet ? "Clear local session" : "Connect Lace"}</button></div>
+        </section>
+
+        <section id="treasury" className="panel treasury-panel">
+          <div className="panel-heading"><span className="section-index">03 / TREASURY</span><span className="panel-state">Policy only</span></div>
+          <h2>One result, one target</h2>
+          <p>Resolution writes only the winning quote side and a 70/30 target. Ties retain the previous target. No token balances or external liquidity are moved by this contract.</p>
+          <div className="allocation"><div style={{ width: `${snapshot?.targetA ?? 50}%` }} /><div style={{ width: `${snapshot?.targetB ?? 50}%` }} /></div>
+          <div className="allocation-labels"><span>QUOTE A · {snapshot?.targetA ?? 50}%</span><span>QUOTE B · {snapshot?.targetB ?? 50}%</span></div>
+          <p className="fine-print">Three intended roles: Quote A, Quote B, and KAI incentive. Native assets and contract-mediated trading are not issued or enabled in this build.</p>
+        </section>
+
+        <section id="rewards" className="panel rewards-panel">
+          <div className="panel-heading"><span className="section-index">04 / REWARDS</span><span className="panel-state">Unavailable</span></div>
+          <h2>Rewards require revenue</h2>
+          <p>There is no fee route or reward pool yet. Kairos does not mint rewards for market signals or display an estimated claim.</p>
+        </section>
+
+        <section id="settings" className="panel settings-panel">
+          <div className="panel-heading"><span className="section-index">05 / SETTINGS</span><span className="panel-state">Diagnostics</span></div>
+          <h2>Network and resolver</h2>
+          <label className="field-label" htmlFor="contract-address">Preprod contract address</label>
+          <input id="contract-address" value={contractAddress} onChange={(event) => {
+            const next = event.target.value.trim();
+            activeAddress.current = next;
+            loadGeneration.current++;
+            setContractAddress(next);
+            setSnapshot(null);
+            setPrepared(null);
+            setSaved(false);
+            setBundle("");
+          }} placeholder="64-character contract address" autoComplete="off" spellCheck={false} />
+          <div className="action-row"><button type="button" className="button-secondary" disabled={Boolean(busy) || !isContractAddress(contractAddress)} onClick={() => void run("refreshing", async () => { await refresh(); setMessage("Public Preprod state loaded."); }, "Could not read this contract from the Preprod indexer.")}>{busy === "refreshing" ? "Loading…" : "Load public state"}</button></div>
+          <label className="field-label" htmlFor="local-password">Local storage password</label>
+          <input id="local-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="16+ characters, 3 character classes" autoComplete="new-password" />
+          <p className="fine-print">Used in this browser to encrypt Midnight signing keys. It is never sent to Kairos. Keep it safe; changing it may make existing local keys inaccessible.</p>
+          <div className="action-row"><button type="button" className="button-secondary" disabled={Boolean(busy) || !wallet} onClick={() => void run("deploying", async () => {
+            const client = await getClient();
+            const deployed = await client.deploy();
+            activeAddress.current = deployed.contractAddress;
+            loadGeneration.current++;
+            setContractAddress(deployed.contractAddress);
+            setReceipt(deployed.receipt);
+            setMessage("Kairos contract finalized on Preprod. Save its public address.");
+            await refreshAfterFinalized(deployed.contractAddress);
+          }, "Deployment did not finalize. Check local proof server, Lace, DUST, and generated artifacts.")}>{busy === "deploying" ? "Deploying and finalizing…" : "Deploy new Preprod contract"}</button>
+          <button type="button" className="button-secondary" onClick={() => void run("checking", async () => {
+            setProofStatus("unknown");
+            const response = await fetch("http://127.0.0.1:6301/health");
+            if (!response.ok) throw new Error("proof server unavailable");
+            setProofStatus("ready");
+            setMessage("Local proof server responded.");
+          }, "Local proof server is unavailable at 127.0.0.1:6301.")}>Check local proof server</button></div>
+          <p className="fine-print">Proof server: {proofStatus}. Private openings sent for proving stay on the local machine only if your browser uses this local service.</p>
+        </section>
+
+        <section className="panel resolver-panel">
+          <div className="panel-heading"><span className="section-index">06 / RESOLUTION</span><span className="panel-state">Trusted resolver</span></div>
+          <h2>Resolve the complete round</h2>
+          <p>Paste a JSON array of eight opening files, in public commitment order. Verification checks each opening against its on-chain hash and publishes only the winner. The resolver learns every side.</p>
+          <label className="field-label" htmlFor="opening-bundle">Private opening bundle</label>
+          <textarea id="opening-bundle" value={bundle} onChange={(event) => setBundle(event.target.value)} placeholder="[ { version, contractAddress, round, side, salt }, ... ]" spellCheck={false} />
+          <div className="action-row"><button type="button" className="button-primary" disabled={Boolean(busy) || snapshot?.phase !== 1n || !bundle} onClick={() => void run("resolving", async () => {
+            if (!snapshot) throw new Error("no round");
+            const openings = parseResolutionBundle(bundle, contractAddress, snapshot.round);
+            const client = await getClient();
+            const result = await client.resolve(contractAddress, openings);
+            setReceipt(result);
+            setBundle("");
+            await refreshAfterFinalized(contractAddress);
+          }, "Resolution failed. Check all eight openings, Lace, and local proving; no result was confirmed.")}>{busy === "resolving" ? "Proving and finalizing…" : "Prove result"}</button>
+          <button type="button" className="button-secondary" disabled={Boolean(busy) || snapshot?.phase !== 2n} onClick={() => void run("advancing", async () => {
+            const client = await getClient();
+            setReceipt(await client.startNextRound(contractAddress));
+            await refreshAfterFinalized(contractAddress);
+          }, "The next round did not finalize.")}>{busy === "advancing" ? "Starting…" : "Start next round"}</button></div>
+        </section>
+      </div>
+      <footer><span>KAIROS / MIDNIGHT PREPROD</span><span>Private signal · Public policy · Execution pending</span></footer>
+    </main>
+  );
+}

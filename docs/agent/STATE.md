@@ -1,11 +1,8 @@
 # Long-Running State
 
-Use this file only for concise durable state across long-running work.
-
-- **Goal:** Build one cumulative Midnight Preprod self-rebalancing DeFi treasury satisfying Levels 1–5.
-- **Current phase:** Phase 0 — capability verification and architecture.
-- **Decisions:** Product identity and project requirements are defined in `docs/product/` and `docs/challenge/LEVELS_1_5.md`.
-- **Verified evidence:** Initial boilerplate generated and committed by the owner. Product implementation has not yet been verified.
-- **Blockers:** Visual-reference assets may still need to be added by the owner. Organizer/category approval remains external when applicable.
-- **Last green checkpoint:** Initial boilerplate.
-- **Next step:** Verify current Midnight Preprod capabilities and finalize the Level 1→5 architecture before replacing the demo contract.
+- **Goal:** One cumulative Kairos Midnight Preprod product for Levels 1–5.
+- **Decision:** The implemented contract is an eight-position commitment market with a complete private-opening proof and public winner/allocation target. It is a signal and policy prototype. Three token issuance, trading, fee collection, rewards, weekly automation, and liquidity execution remain unimplemented; see `docs/research/PRODUCT_CAPABILITIES.md`.
+- **Verified locally:** Compact compiler 0.31.1 compiled three circuits; four contract tests passed; eleven application unit tests, lint, typecheck, production build, and three Playwright flows passed. The dedicated proof server 8.1.0 responded at `127.0.0.1:6301`. The browser rendered the revised artwork and reached the proof server.
+- **Preprod evidence:** No finalized deployment, contract address, or circuit transaction has been observed. The Codex in-app browser can load Kairos and reach its proof server, but has no injected Lace; the owner reported a funded Lace wallet in another browser and was asked to try the local URL there.
+- **External blockers:** No verified organizer/category approval, public demo URL, hosted CI run/badge, or real users/feedback. Levels 4–5 challenge completion depend on these conditions. Manual exclusions: Vercel deployment, video, screenshots, and collecting feedback.
+- **Next:** Finish the final local verification/diff review. If Lace becomes accessible, deploy and verify public state on Preprod before adding its address to README. Validate token primitives separately on Preprod before integrating an economic route.

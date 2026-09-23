@@ -1,128 +1,83 @@
-# Codex + Midnight Production Boilerplate
+# Kairos
 
-A single full-stack **Next.js 16** application prepared for Codex-driven, multi-agent development on Midnight Network.
+> A bounded private signal market that writes a public quote-side allocation target on Midnight Preprod.
 
-The repository is intentionally opinionated: small scoped instructions, bounded subagents, evidence-first changes, deterministic verification, safe Git behavior, and a pinned Midnight compatibility surface.
+## Live Demo
 
-## Stack
+No public demo URL has been verified. Run the app locally using the instructions below.
 
-- Next.js 16.3.6, App Router, React 19, TypeScript, Tailwind CSS 4
-- Node.js 22
-- Midnight Network
-- Compact toolchain 0.31.1 / language 0.23
-- Midnight.js 4.1.1
-- DApp Connector API 4.0.1
-- Proof server 8.1.0
-- Lace wallet
-- Vitest + Testing Library
-- Playwright
-- GitHub Actions
+## Contract Address
 
-## Start
+| Network | Address |
+| --- | --- |
+| Preprod | Deployment not yet verified |
 
-```bash
-cp .env.example .env.local
-npm install
-npm run agent:doctor
-npm run dev
-```
+## What This Product Does
 
-Open `http://localhost:3000` and use **Connect Lace** in a browser where Lace is installed.
+Kairos is building a self-rebalancing treasury driven by private market conviction. The implemented Compact contract accepts eight salted quote-side commitments per round, proves that all eight openings match the public commitments, and publishes one winner. It sets a 70/30 allocation target for the winning side; a tie retains the previous target. The round can then be restarted.
 
-## Midnight setup
+This is a **policy and signal prototype**. It does not issue assets, accept deposits, trade, move liquidity, collect fees, or pay rewards. The intended three-token economy, asymmetric contract-mediated trading route, and treasury execution are separate work. Native token transfers on Midnight can bypass any contract trading route, so a token-wide transfer tax is not claimed.
 
-Install Compact devtools, then pin the compiler line used by the current public-network compatibility matrix:
+## Privacy Model
 
-```bash
-curl --proto '=https' --tlsv1.2 -LsSf \
-  https://github.com/midnightntwrk/compact/releases/download/compact-v0.5.1/compact-installer.sh | sh
-compact update 0.31
-compact compile --version
-```
+- **Public:** transaction timing, commitment order/count and hashes, round phase, winner, and allocation targets.
+- **Private from the public ledger:** the side and random salt supplied to each commitment circuit, and the eight openings supplied to the resolution circuit.
+- **Proved:** every opening matches its indexed commitment and the published winner follows the complete eight-opening tally.
 
-Start the local proof server:
+The participant must save an opening file and share it privately with a **trusted resolver**. That resolver sees all sides. Its proof server receives the full witness; use the included loopback-only proof server or another service you control. Commitments do not prove unique people or prevent one wallet from taking several positions. Eight-person cohorts and public timing may allow inference. These limits are documented in [the usage guide](docs/USAGE.md).
 
-```bash
-npm run proof:up
-npm run proof:status
-```
+## Privacy Claim
 
-Compile every contract in `contracts/src/`:
+An on-chain observer sees the commitment hash and transaction timing for each position but does not receive its side or salt in the public ledger. Resolution discloses the winning side, not the individual openings. This is a ledger privacy claim, not anonymity or privacy from the trusted resolver, proof server, wallet, or device.
 
-```bash
+## Tech Stack
+
+Next.js 16, React 19, TypeScript, Compact language 0.23/compiler 0.31.1, Midnight.js 4.1.1, DApp Connector API 4.0.1, Lace, proof server 8.1.0, Vitest, and Playwright.
+
+## Prerequisites
+
+Node.js 22, npm, Docker, Compact compiler 0.31.1, a Preprod Lace wallet for transactions, and Preprod DUST. On Windows, install Compact in WSL Ubuntu; the Windows `compact.exe` is an unrelated system tool.
+
+## Setup & Run Locally
+
+1. Copy `.env.example` to `.env.local` and keep `NEXT_PUBLIC_MIDNIGHT_NETWORK=preprod`.
+2. Run `npm ci`.
+3. Install Compact devtools 0.5.1 and compiler 0.31.1 using the [official setup guide](https://docs.midnight.network/getting-started/installation).
+4. Run `npm run compact:compile` to create `contracts/managed/kairos` and public proving artifacts under `public/zk/kairos`.
+5. Run `npm run proof:up` and `npm run proof:status`. The dedicated Kairos server binds `127.0.0.1:6301`. If Lace is configured for local proving, it separately expects a trusted server at `localhost:6300` according to Midnight's [toolchain guide](https://docs.midnight.network/getting-started/installation); ensure that service is available before wallet transactions.
+6. Run `npm run dev`, then open `http://localhost:3000` in a browser with Lace on Preprod.
+7. Connect Lace, enter a 16+ character local storage password, and use the Settings panel to deploy a contract if no verified address is available. Save the returned public address and transaction ID.
+
+The app has no server-held wallet keys. The browser encrypts local Midnight signing-key storage using the password you supply. It is not a recovery phrase. Never send opening files to an untrusted resolver.
+
+## Run Tests
+
+```text
 npm run compact:compile
-```
-
-Generated Compact artifacts go to `contracts/managed/` and are intentionally ignored by Git.
-
-## Verification
-
-Fast local gate:
-
-```bash
+npm run test:contracts
 npm run verify:fast
-```
-
-Full application gate:
-
-```bash
-npm run verify
-```
-
-Browser gate:
-
-```bash
-npx playwright install chromium
+npm run build
 npm run test:e2e
 ```
 
-For a Compact change, also run:
+`npm run verify` runs compile, contract tests, fast checks, and build. Browser tests need Playwright Chromium (`npx playwright install chromium`). Local checks are not evidence of a successful Preprod transaction.
 
-```bash
-npm run compact:compile
-npm run test:contracts
-npm run proof:status
-```
+## CI/CD
 
-## Codex operating model
+`.github/workflows/ci.yml` runs the compiler, tests, typecheck, lint, build, and browser tests on pushes to `main` and pull requests. There is no repository remote or passing hosted CI run verified in this checkout, so no green badge is shown.
 
-Codex reads `AGENTS.md` from the repository root and applies narrower `AGENTS.md` files as it enters scoped directories. Project-local agent configuration lives in `.codex/`, while reusable workflows live in `.agents/skills/`.
+## Usage Guide
 
-The default rule is **one writer, multiple readers**. Subagents are used for independent exploration, verification, documentation lookup, and bounded work—not as a default for every task.
+See [docs/USAGE.md](docs/USAGE.md).
 
-Read these first:
+## Product Proposal
 
-- `AGENTS.md` — repository-wide operating contract
-- `docs/agent/OPERATING_MODEL.md` — orchestration and model-selection rules
-- `docs/engineering/DEFINITION_OF_DONE.md` — completion gate
-- `docs/midnight/WORKFLOW.md` — Compact, proof server, wallet, and privacy workflow
-- `docs/architecture/ARCHITECTURE.md` — application boundaries
-- `docs/research/DESIGN_BASIS.md` — researched alternatives and why this architecture was chosen
+See [PROPOSAL.md](PROPOSAL.md). The owner's required proposal answers and organizer/category approval remain pending.
 
-## Durable long-running state
+## Level 5 — User Validation
 
-For work that spans many steps, keep concise state in:
+Target: 50 verified Preprod users. Current verified count: **0/50**. See [USERS.md](USERS.md) and [docs/FEEDBACK.md](docs/FEEDBACK.md). A wallet address alone does not prove a distinct person.
 
-- `docs/agent/STATE.md`
-- `docs/agent/TASKS.md`
+## Project Status
 
-Do not dump terminal logs or full research transcripts there. Store only decisions, evidence references, blockers, completed verification, and the next concrete step.
-
-## Git policy
-
-Codex may create commits autonomously after a coherent milestone is green. It must not push, force-push, rewrite shared history, run destructive cleanup, or discard user changes unless explicitly instructed.
-
-Use Conventional Commits and keep commits reversible and logically scoped.
-
-## Important Midnight security defaults
-
-- Treat all values written to ledger/public outputs as public.
-- Never use a proof server you do not control for private witness data.
-- Never log private state, seeds, secrets, full wallet payloads, or proving inputs.
-- Never treat `ownPublicKey()` or any unconstrained witness result as trusted authentication.
-- Do not edit generated Compact artifacts by hand.
-- Verify version-sensitive Midnight APIs against the official docs and the compatibility matrix before implementation.
-
-## Replace the demo contract
-
-`contracts/src/hello-world.compact` is deliberately tiny and stores a public message. It exists only to prove the compile pipeline. Replace it with the project contract and add contract-specific tests before shipping real functionality.
+See [the Level 1–5 evidence table](docs/challenge/IMPLEMENTATION_STATUS.md) and [docs/agent/STATE.md](docs/agent/STATE.md). There is no verified deployment address, public demo, hosted CI badge, organizer approval, or user feedback yet.

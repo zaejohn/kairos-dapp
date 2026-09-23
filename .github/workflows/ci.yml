@@ -24,12 +24,13 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
-      - name: Fast verification
-        run: npm run verify:fast
-      - name: Production build
-        run: npm run build
-      - name: Contract source policy
-        run: npm run test:contracts
+      - name: Install Compact devtools and compiler
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/download/compact-v0.5.1/compact-installer.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/compact" update 0.31.1
+      - name: Compile, test, and build
+        run: npm run verify
 
   e2e:
     runs-on: ubuntu-latest
@@ -43,6 +44,13 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - name: Install Compact devtools and compiler
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/download/compact-v0.5.1/compact-installer.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/compact" update 0.31.1
+      - name: Compile browser and contract artifacts
+        run: npm run compact:compile
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Browser tests

@@ -1,10 +1,11 @@
 import "@midnight-ntwrk/dapp-connector-api";
-import type { InitialAPI } from "@midnight-ntwrk/dapp-connector-api";
+import type { ConnectedAPI, InitialAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { AppError } from "@/lib/errors/app-error";
 import type { MidnightNetwork } from "@/lib/midnight/config";
 
 export interface LaceConnection {
   shieldedAddress: string;
+  api: ConnectedAPI;
 }
 
 export async function connectLace(network: MidnightNetwork): Promise<LaceConnection> {
@@ -23,8 +24,11 @@ export async function connectLace(network: MidnightNetwork): Promise<LaceConnect
     const connectedApi = await wallet.connect(network);
     const connectionStatus = await connectedApi.getConnectionStatus();
 
-    if (!connectionStatus) {
+    if (connectionStatus.status !== "connected") {
       throw new AppError("WALLET_NOT_CONNECTED", "Lace did not establish a wallet connection.");
+    }
+    if (connectionStatus.networkId !== network) {
+      throw new AppError("WALLET_WRONG_NETWORK", `Lace connected to ${connectionStatus.networkId}. Switch Lace to ${network} and retry.`);
     }
 
     const addresses = await connectedApi.getShieldedAddresses();
@@ -33,7 +37,7 @@ export async function connectLace(network: MidnightNetwork): Promise<LaceConnect
       throw new AppError("WALLET_ADDRESS_MISSING", "Lace connected but did not return a shielded address.");
     }
 
-    return { shieldedAddress: addresses.shieldedAddress };
+    return { shieldedAddress: addresses.shieldedAddress, api: connectedApi };
   } catch (cause) {
     if (cause instanceof AppError) {
       throw cause;

@@ -1,4 +1,4 @@
-export const MIDNIGHT_NETWORKS = ["undeployed", "preview", "preprod", "mainnet"] as const;
+export const MIDNIGHT_NETWORKS = ["preprod"] as const;
 
 export type MidnightNetwork = (typeof MIDNIGHT_NETWORKS)[number];
 

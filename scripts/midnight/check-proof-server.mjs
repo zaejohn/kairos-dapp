@@ -1,4 +1,4 @@
-const baseUrl = process.env.MIDNIGHT_PROOF_SERVER_URL ?? "http://127.0.0.1:6300";
+const baseUrl = process.env.MIDNIGHT_PROOF_SERVER_URL ?? "http://127.0.0.1:6301";
 const expectedVersion = "8.1.0";
 
 async function read(path) {

@@ -30,6 +30,7 @@ npm-debug.log*
 
 # generated Midnight/Compact artifacts
 /contracts/managed
+/public/zk
 
 # Codex local logs/state that should not be shared
 /.codex-log
