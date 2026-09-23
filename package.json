@@ -2,13 +2,15 @@
   "name": "kairos",
   "version": "0.1.0",
   "private": true,
-  "description": "KAIROS — a confidential, self-rebalancing DeFi treasury on Midnight",
+  "description": "KAIROS \u2014 a confidential, self-rebalancing DeFi treasury on Midnight",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
     "compile": "compact compile contracts/kairos.compact managed/kairos",
     "zk:sync": "node scripts/sync-zk.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "proof-server": "bash scripts/verify-proof-server.sh",
     "build:contract": "npm run compile && npm run zk:sync",
     "dev": "next dev",
     "build": "next build",

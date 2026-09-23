@@ -1,16 +1,15 @@
-Switch the wallet/deployment flow from Lace to **1AM (https://1am.xyz/)**.
+I now have both **tNIGHT and DUST on Midnight Preprod in 1AM**.
 
-Use 1AM for **Midnight Preprod** deployment instead of Lace. First verify the current 1AM + Midnight integration and required setup, then make the minimum changes needed.
+Proceed with the existing KAIROS deployment flow now.
 
-Goal:
+- Keep the proof server running.
+- Deploy `contracts/kairos.compact` to Preprod.
+- Use 1AM for wallet signing.
+- Get the real contract address.
+- Update the required `.env`/config.
+- Execute a real KAIROS circuit call.
+- Verify the proof server receives `/prove`.
+- Verify the transaction succeeds.
+- Run the existing E2E proving test.
 
-- Connect 1AM to Midnight Preprod
-- Ensure tNIGHT + DUST are available
-- Deploy `contracts/kairos.compact`
-- Get the real contract address
-- Execute a real circuit transaction
-- Confirm the proof server receives `/prove`
-- Verify actual proof generation and successful transaction submission
-- Run the existing E2E test
-
-Do not mock, fake, or invent anything. Do not modify unrelated code. Preserve the existing passing tests and dependency versions.
+Do not mock or invent anything. Stop and diagnose if anything fails.
