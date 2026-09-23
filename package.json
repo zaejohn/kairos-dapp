@@ -22,6 +22,7 @@
     "proof:down": "docker compose -f infra/midnight/proof-server.yml down",
     "proof:logs": "docker compose -f infra/midnight/proof-server.yml logs -f proof-server",
     "proof:status": "node scripts/midnight/check-proof-server.mjs",
+    "proof:smoke": "node scripts/midnight/smoke-local-proofs.mjs",
     "compact:version": "compact compile --version",
     "compact:compile": "node scripts/midnight/compile-contracts.mjs",
     "agent:doctor": "node scripts/agent/doctor.mjs",
@@ -46,6 +47,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "4.1.1",
     "@midnight-ntwrk/testkit-js": "4.1.1",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",

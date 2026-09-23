@@ -62,9 +62,10 @@ npm run test:contracts
 npm run verify:fast
 npm run build
 npm run test:e2e
+npm run proof:smoke
 ```
 
-`npm run verify` runs compile, contract tests, fast checks, and build. Browser tests need Playwright Chromium (`npx playwright install chromium`). Local checks are not evidence of a successful Preprod transaction.
+`npm run verify` runs compile, contract tests, fast checks, and build. Browser tests need Playwright Chromium (`npx playwright install chromium`). `proof:smoke` additionally requires the local proof server at `127.0.0.1:6301` and checks/proves all seven circuits with synthetic inputs. It does not balance or submit a transaction. Local checks are not evidence of a successful Preprod transaction.
 
 ## CI/CD
 
