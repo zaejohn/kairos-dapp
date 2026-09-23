@@ -3,6 +3,10 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
+  // Next.js otherwise writes AGENTS.md / CLAUDE.md into the repository on every
+  // dev run. The project keeps its documentation intentional and hand-written.
+  agentRules: false,
+
   // The Compact compiler emits ESM contract bindings together with the zkir and
   // prover/verifier key files. The bindings are imported directly from ./managed,
   // so they must be bundled rather than treated as an external package.

@@ -211,10 +211,28 @@ source and diffs against the committed tree to prevent drift.
 npm test
 ```
 
-**44 tests**, running the real compiled circuits through the Compact runtime
-simulator — the same artifacts that ship to the browser. No proof server is
-required, so the suite is fast and deterministic while still enforcing the
-circuit logic, assertions and disclosure rules.
+**50 tests** across two files.
+
+`tests/kairos.test.ts` (44 tests) runs the real compiled circuits through the
+Compact runtime simulator — the same artifacts that ship to the browser. No
+proof server is required, so the suite is fast and deterministic while still
+enforcing the circuit logic, assertions and disclosure rules.
+
+`tests/proving.e2e.test.ts` (6 tests) covers the proving infrastructure: every
+circuit has a loadable, non-empty zkir and key pair; the combined key material
+the proof provider requests resolves; the compiler provenance recorded in
+`contract-info.json` matches the pinned runtime; and a real proof server is
+reachable and running the expected version. These skip automatically when no
+proof server is listening.
+
+**What the test suite does not verify: proof generation itself.** Proving a
+circuit call needs a fully-formed ledger transaction (a real `ZswapChainState`
+and contract address), which in practice comes from a deployed contract. That
+step is verified by deployment — see [Deployment](#deployment). This is called
+out explicitly because it would be easy to fake: a test that proves a *deploy*
+transaction looks like it verifies proving, but a deploy carries verifier keys
+onto the chain and contains no circuit proof, so it passes without the proof
+server ever being contacted.
 
 Coverage:
 
