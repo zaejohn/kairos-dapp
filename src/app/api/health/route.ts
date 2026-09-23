@@ -6,7 +6,7 @@ export function GET() {
   return NextResponse.json(
     {
       ok: true,
-      service: "codex-midnight-boilerplate",
+      service: "kairos",
       timestamp: new Date().toISOString(),
     },
     { headers: { "cache-control": "no-store" } },
