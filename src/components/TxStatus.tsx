@@ -33,9 +33,27 @@ export const TxStatus = ({ tx }: { tx: TxPhase }) => {
 
   if (tx.kind === 'submitted') {
     return (
+      <div className="flex items-center gap-3 rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5 px-4 py-3">
+        <span
+          className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent"
+          aria-hidden
+        />
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-[var(--color-accent)]">{tx.label}</p>
+          <p className="mt-0.5 text-[11px] text-[var(--color-ink-muted)]">
+            Submitted — waiting for the network to confirm. Further actions are held until it
+            lands, because the wallet rejects a second transaction while one is pending.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (tx.kind === 'confirmed') {
+    return (
       <Notice>
         <span className="font-semibold text-[var(--color-success)]">{tx.label}</span> —
-        submitted. Transaction{' '}
+        confirmed. Transaction{' '}
         <span className="tabular" title={tx.txId}>
           {truncateAddress(tx.txId, 12, 8)}
         </span>

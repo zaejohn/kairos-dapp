@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { Button, Card, Field, Notice, Stat, inputClass } from './ui';
 import { formatAmount, formatBps } from '@/lib/format';
 import type { Ledger } from '@managed/kairos/contract/index.js';
-import type { TxPhase } from '@/hooks/useKairos';
+import { isPending, type TxPhase } from '@/hooks/useKairos';
 
 const BPS_TOTAL = 10_000n;
 
@@ -32,7 +32,9 @@ export const FlipPanel = ({
   const [amount, setAmount] = useState('1000');
   const [parseError, setParseError] = useState<string | null>(null);
 
-  const busy = tx.kind === 'proving';
+  // Locked for the entire pending window, not just proving: the wallet
+  // refuses a second transaction while one is still in flight.
+  const busy = isPending(tx);
   const sourceReserve = direction === 0n ? ledger.reserveA : ledger.reserveB;
   const taxRate = direction === 0n ? ledger.taxRateAtoB : ledger.taxRateBtoA;
 

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button, Card, Chip, Field, Notice, inputClass } from './ui';
 import { MAX_WEIGHT, MIN_WEIGHT, type KairosPrivateState } from '@/lib/contract/witnesses';
 import { MarketState, type Ledger } from '@managed/kairos/contract/index.js';
-import type { TxPhase } from '@/hooks/useKairos';
+import { isPending, type TxPhase } from '@/hooks/useKairos';
 
 type Side = 0n | 1n;
 
@@ -37,7 +37,9 @@ export const PositionPanel = ({
   const [weight, setWeight] = useState('100');
   const [parseError, setParseError] = useState<string | null>(null);
 
-  const busy = tx.kind === 'proving';
+  // Locked for the entire pending window, not just proving: the wallet
+  // refuses a second transaction while one is still in flight.
+  const busy = isPending(tx);
   const isOpen = ledger.marketState === MarketState.OPEN;
   const isClosed = ledger.marketState === MarketState.CLOSED;
 

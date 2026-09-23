@@ -32,7 +32,54 @@ export type TxPhase =
   | { readonly kind: 'idle' }
   | { readonly kind: 'proving'; readonly label: string }
   | { readonly kind: 'submitted'; readonly label: string; readonly txId: string }
+  | { readonly kind: 'confirmed'; readonly label: string; readonly txId: string }
   | { readonly kind: 'error'; readonly label: string; readonly message: string };
+
+/**
+ * Whether a transaction is in flight.
+ *
+ * True from the moment proving starts until the network has finalized the
+ * transaction — deliberately wider than "we have submitted something".
+ * The wallet refuses a second transaction while one is pending, so releasing
+ * the UI at `submitted` produces an error the user cannot act on:
+ *
+ *   A transaction is already pending. Wait for it to confirm or expire
+ *   before requesting another.
+ */
+export const isPending = (tx: TxPhase): boolean =>
+  tx.kind === 'proving' || tx.kind === 'submitted';
+
+/** How long to wait for finalization before releasing the UI regardless. */
+const FINALIZE_TIMEOUT_MS = 120_000;
+
+/**
+ * Wait until the transaction is finalized.
+ *
+ * Bounded, because an indexer stall must not lock the app permanently — if
+ * finalization cannot be observed in time the UI is released anyway and the
+ * wallet's own pending-transaction guard remains the backstop.
+ */
+const waitForFinalization = async (
+  providers: KairosProviders | null,
+  txId: string | undefined,
+): Promise<boolean> => {
+  if (!providers || !txId) return false;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      providers.publicDataProvider.watchForTxData(txId as never),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('finalization timeout')), FINALIZE_TIMEOUT_MS);
+      }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
 
 export type WalletStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -196,16 +243,58 @@ export const useKairos = (): UseKairos => {
 
   // --- writes --------------------------------------------------------------
 
-  /** Run a circuit call, tracking proving/submitted/error phases around it. */
+  // Guards against two circuit calls overlapping. React state updates are
+  // asynchronous, so a `tx.kind` check alone cannot stop a second click that
+  // lands before the first render — the wallet would then reject the second
+  // transaction as a duplicate.
+  const inFlightRef = useRef(false);
+
+  /**
+   * Run a circuit call, tracking it through to finalization.
+   *
+   * The lock is released only once the transaction is finalized (or the wait
+   * is abandoned as unobservable), never at submission.
+   */
   const runCircuit = useCallback(
     async (label: string, call: () => Promise<{ public: { txId: string } }>) => {
+      if (inFlightRef.current) {
+        setTx({
+          kind: 'error',
+          label,
+          message:
+            'A transaction is already in progress. Wait for it to confirm before starting another.',
+        });
+        return;
+      }
+
+      inFlightRef.current = true;
       setTx({ kind: 'proving', label });
+
       try {
         const result = await call();
-        setTx({ kind: 'submitted', label, txId: result.public.txId });
+        const txId = result.public.txId;
+        setTx({ kind: 'submitted', label, txId });
+
+        // Hold the UI until the network has the transaction. Submitting is not
+        // the same as landing, and the wallet rejects a new transaction while
+        // one is still pending.
+        const finalized = await waitForFinalization(providersRef.current, txId);
+        setTx({ kind: 'confirmed', label, txId });
+
+        if (!finalized) {
+          // Confirmed as submitted, but finalization was not observed in time.
+          // The state read below may therefore still lag.
+          setLedgerError(
+            'Transaction submitted, but confirmation took longer than expected. ' +
+              'The displayed state may lag until the indexer catches up.',
+          );
+        }
+
         await refresh();
       } catch (error) {
         setTx({ kind: 'error', label, message: messageOf(error) });
+      } finally {
+        inFlightRef.current = false;
       }
     },
     [refresh],

@@ -3,7 +3,7 @@
 import { Button, Card, Chip, Notice, Stat } from './ui';
 import { formatBps } from '@/lib/format';
 import { MarketState, Side, type Ledger } from '@managed/kairos/contract/index.js';
-import type { TxPhase } from '@/hooks/useKairos';
+import { isPending, type TxPhase } from '@/hooks/useKairos';
 
 /** Human-readable lifecycle label for each on-chain state. */
 const STATE_LABEL: Record<MarketState, string> = {
@@ -47,7 +47,9 @@ export const MarketPanel = ({
   onFinalize: () => void;
   onNext: () => void;
 }) => {
-  const busy = tx.kind === 'proving';
+  // Locked for the entire pending window, not just proving: the wallet
+  // refuses a second transaction while one is still in flight.
+  const busy = isPending(tx);
   const { marketState } = ledger;
 
   return (
