@@ -16,7 +16,7 @@ The [Fantastical Factory reference](https://docs.fantasticalfactory.com/) inform
 
 Unshielded minting has a [reported Compact ledger-partitioning failure](https://github.com/LFDT-Minokawa/compact/issues/235) when combined with fallible operations. Genesis contains no assert and later calls cannot inflate supply, but no transaction has been submitted and finalized on Preprod. A real wallet transaction is required before claiming issuance or trade runtime success. Direct wallet-to-wallet transfers bypass Kairos routes and fees. KAI is a fixed-supply trade incentive, not a claim on fees or NIGHT; the public fee pool has no withdrawal route.
 
-After resolution, a separate public call mathematically constrains an internal split of NIGHT redemption capacity to the target percentage. This affects which side can redeem; it does not move external liquidity or guarantee a side can redeem after capacity moves away. No supported external liquidity venue/counterparty path was verified. Weekly timing and autonomous transaction submission are not implemented, so the operator must submit round and allocation calls.
+After resolution, a separate public call mathematically constrains an internal split of NIGHT redemption capacity to the target percentage. The next round cannot start until the current split matches the target, including after intervening trades. This affects which side can redeem; it does not move external liquidity or guarantee a side can redeem after capacity moves away. No supported external liquidity venue/counterparty path was verified. Weekly timing and autonomous transaction submission are not implemented, so the operator must submit round and allocation calls.
 
 ## Upgrade boundaries
 

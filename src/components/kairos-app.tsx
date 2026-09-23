@@ -8,6 +8,7 @@ import { createOpening, isContractAddress, openingSaltBytes, parseResolutionBund
 import type { MarketSnapshot, PublicTxReceipt } from "@/lib/midnight/market-client";
 import { AppError } from "@/lib/errors/app-error";
 import { parseTradeAmount, tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
+import { allocationMatchesTarget } from "@/lib/market/allocation";
 
 const stations = [
   { label: "Rewards", target: "rewards", className: "station-rewards" },
@@ -129,6 +130,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
   const tradeGross = /^[1-9][0-9]*$/.test(tradeAmount) && BigInt(tradeAmount) >= 100n && BigInt(tradeAmount) <= (1n << 64n) - 1n ? BigInt(tradeAmount) : null;
   const tradeBps = snapshot && (tradeDirection === "buy" ? (tradeSide === 0 ? snapshot.buyFeeA : snapshot.buyFeeB) : (tradeSide === 0 ? snapshot.sellFeeA : snapshot.sellFeeB));
   const displayedFee = tradeGross !== null && tradeBps !== null && tradeBps !== undefined ? tradeFee(tradeGross, tradeBps) : null;
+  const allocationApplied = snapshot !== null && allocationMatchesTarget(snapshot.reserveA, snapshot.reserveB, snapshot.targetA);
 
   return (
     <main>
@@ -251,13 +253,13 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
         </section>
 
         <section id="treasury" className="panel treasury-panel">
-          <div className="panel-heading"><span className="section-index">04 / TREASURY</span><span className="panel-state">Internal allocation</span></div>
+          <div className="panel-heading"><span className="section-index">04 / TREASURY</span><span className="panel-state">{snapshot?.phase === 2n ? allocationApplied ? "Target applied" : "Awaiting allocation" : "Internal allocation"}</span></div>
           <h2>One result, one target</h2>
           <p>Resolution sets the winning quote side and a 70/30 target. Anyone can apply that target to the internal NIGHT redemption limits. This changes which quote side can be redeemed, without moving assets to an external exchange.</p>
           <div className="allocation"><div style={{ width: `${snapshot?.targetA ?? 50}%` }} /><div style={{ width: `${snapshot?.targetB ?? 50}%` }} /></div>
           <div className="allocation-labels"><span>QUOTE A · {snapshot?.targetA ?? 50}%</span><span>QUOTE B · {snapshot?.targetB ?? 50}%</span></div>
           <p>Side reserves: A {snapshot?.reserveA.toString() ?? "—"} · B {snapshot?.reserveB.toString() ?? "—"} atomic NIGHT. Fee pool: {snapshot?.feePool.toString() ?? "—"}.</p>
-          <div className="action-row"><button type="button" className="button-secondary" disabled={Boolean(busy) || snapshot?.phase !== 2n || !wallet} onClick={() => void run("rebalancing", async () => {
+          <div className="action-row"><button type="button" className="button-secondary" disabled={Boolean(busy) || snapshot?.phase !== 2n || allocationApplied || !wallet} onClick={() => void run("rebalancing", async () => {
             const client = await getClient();
             setReceipt(await client.rebalance(contractAddress));
             await refreshAfterFinalized(contractAddress);
@@ -326,11 +328,12 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
             setBundle("");
             await refreshAfterFinalized(contractAddress);
           }, "Resolution failed. Check all eight openings, Lace, and local proving; no result was confirmed.")}>{busy === "resolving" ? "Proving and finalizing…" : "Prove result"}</button>
-          <button type="button" className="button-secondary" disabled={Boolean(busy) || snapshot?.phase !== 2n} onClick={() => void run("advancing", async () => {
+          <button type="button" className="button-secondary" disabled={Boolean(busy) || snapshot?.phase !== 2n || !allocationApplied || !wallet} onClick={() => void run("advancing", async () => {
             const client = await getClient();
             setReceipt(await client.startNextRound(contractAddress));
             await refreshAfterFinalized(contractAddress);
           }, "The next round did not finalize.")}>{busy === "advancing" ? "Starting…" : "Start next round"}</button></div>
+          {snapshot?.phase === 2n && !allocationApplied && <p className="fine-print">Apply the resolved allocation in Treasury before starting the next round.</p>}
         </section>
       </div>
       <footer><span>KAIROS / MIDNIGHT PREPROD</span><span>Private signal · Public policy · Contract-custodied trading</span></footer>

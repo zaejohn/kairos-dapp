@@ -217,6 +217,12 @@ export circuit rebalanceTreasury(candidateA: Uint<128>): [] {
 
 export circuit startNextRound(): [] {
   assert(phase == 2, "current round is unresolved");
+  // A new round cannot bypass the resolved treasury policy. Reapply it after
+  // any intervening trades that changed the reserve ratio.
+  const total = (reserveA + reserveB) as Uint<128>;
+  const scaled = total * targetA;
+  const lower = reserveA * (100 as Uint<7>);
+  assert(lower <= scaled && scaled < lower + (100 as Uint<7>), "treasury target is not applied");
   commitments.resetToDefault();
   nextIndex = 0;
   round = (round + 1) as Uint<32>;

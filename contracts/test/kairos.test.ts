@@ -153,8 +153,14 @@ describe("Kairos bounded private market", () => {
     positions.forEach(market.commit);
     market.resolve(positions);
     expect([market.state().buyFeeA, market.state().buyFeeB, market.state().sellFeeA, market.state().sellFeeB]).toEqual([100n, 500n, 300n, 700n]);
+    expect(() => market.next()).toThrow(/treasury target is not applied/);
     expect(() => market.rebalance(13579n)).toThrow();
     market.rebalance(13580n);
     expect([market.state().reserveA, market.state().reserveB, market.state().feePool]).toEqual([13580n, 5820n, 600n]);
+    market.buy(0n, 10000n, 100n);
+    expect(() => market.next()).toThrow(/treasury target is not applied/);
+    market.rebalance(20510n);
+    market.next();
+    expect(market.state().round).toBe(2n);
   });
 });

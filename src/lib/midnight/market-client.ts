@@ -16,6 +16,7 @@ import { fromHex, parseCoinPublicKeyToHex, parseEncPublicKeyToHex, PasswordValid
 import { Contract, ledger, type Opening } from "../../../contracts/managed/kairos/contract/index.js";
 import { AppError } from "@/lib/errors/app-error";
 import { tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
+import { targetReserveA } from "@/lib/market/allocation";
 
 const INDEXER_HTTP = "https://indexer.preprod.midnight.network/api/v4/graphql";
 const INDEXER_WS = "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
@@ -207,7 +208,7 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
     async rebalance(contractAddress: string): Promise<PublicTxReceipt> {
       const state = await readPublicMarket(contractAddress);
       if (state.phase !== 2n) throw new AppError("ROUND_NOT_RESOLVED", "Resolve the round before rebalancing.");
-      const targetA = (state.reserveA + state.reserveB) * state.targetA / 100n;
+      const targetA = targetReserveA(state.reserveA, state.reserveB, state.targetA);
       const contract = await found(contractAddress);
       const result = await contract.callTx.rebalanceTreasury(targetA);
       return { txId: result.public.txId, blockHeight: result.public.blockHeight };

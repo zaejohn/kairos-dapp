@@ -52,3 +52,11 @@ it("quotes the public asymmetric fee and keeps trading gated on a wallet", async
   expect(screen.getByText(/700 units \(700 bps\)/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sell Quote A" })).toBeDisabled();
 });
+
+it("shows the treasury step when a resolved round has unapplied reserves", async () => {
+  const address = "a".repeat(64);
+  readPublicMarket.mockResolvedValue({ ...publicState(1n), phase: 2n, targetA: 70n, targetB: 30n, reserveA: 9_700n, reserveB: 9_700n });
+  render(<KairosApp initialContractAddress={address} />);
+  expect(await screen.findByText("Apply the resolved allocation in Treasury before starting the next round.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start next round" })).toBeDisabled();
+});

@@ -14,7 +14,7 @@ No public demo URL has been verified. Run the app locally using the instructions
 
 ## What This Product Does
 
-Kairos is building a self-rebalancing treasury driven by private market conviction. The Compact contract accepts eight salted quote-side commitments per round, proves that all eight openings match the public commitments, and publishes one winner. It sets a 70/30 allocation target for the winning side; a tie retains the previous target. The round can then be restarted.
+Kairos is building a self-rebalancing treasury driven by private market conviction. The Compact contract accepts eight salted quote-side commitments per round, proves that all eight openings match the public commitments, and publishes one winner. It sets a 70/30 allocation target for the winning side; a tie retains the previous target. The next round starts only after the current internal reserve split matches that target.
 
 The same contract now compiles with a fixed, one-time contract-custodied issuance of Quote A, Quote B, and KAI; public NIGHT/quote buy and sell routes with asymmetric basis-point fees; a fixed-supply KAI trade incentive; and a separate call that reapportions internal NIGHT redemption limits after resolution. These circuits and their accounting tests have **local evidence only**. No issuance, trade, reserve change, or finalized deployment has been observed on Preprod. The route does not provide an external exchange or guarantee redemption when a side reserve is depleted. Wallet-to-wallet transfers bypass Kairos fees, so no token-wide tax is claimed.
 
