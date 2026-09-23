@@ -211,12 +211,18 @@ source and diffs against the committed tree to prevent drift.
 npm test
 ```
 
-**50 tests** across two files.
+**83 tests** across three files.
 
 `tests/kairos.test.ts` (44 tests) runs the real compiled circuits through the
 Compact runtime simulator — the same artifacts that ship to the browser. No
 proof server is required, so the suite is fast and deterministic while still
 enforcing the circuit logic, assertions and disclosure rules.
+
+`tests/reliability.test.ts` (33 tests) covers the lifecycle as an exhaustive
+transition matrix — every (state, circuit) pair is asserted, so each transition
+has a defined outcome rather than only the ones we thought to test — plus long
+adversarial sequences, rejected-transition side-effect freedom, and the
+presentation arithmetic.
 
 `tests/proving.e2e.test.ts` (6 tests) covers the proving infrastructure: every
 circuit has a loadable, non-empty zkir and key pair; the combined key material

@@ -66,9 +66,17 @@ export const MarketPanel = ({
         <Stat label="Commitments" value={ledger.positionCount.toString()} />
         <Stat label="Revealed → A" value={ledger.tallyA.toString()} accent="a" />
         <Stat label="Revealed → B" value={ledger.tallyB.toString()} accent="b" />
+        {/* `winner` is per-market state and resets when the next market opens,
+            so this reports the current market's outcome rather than a running
+            "last winner" that the contract does not actually retain. */}
         <Stat
-          label="Last winner"
+          label="Winner"
           value={ledger.winner === Side.NONE ? '—' : winnerLabel(ledger.winner)}
+          hint={
+            ledger.winner === Side.NONE && ledger.marketState === MarketState.SETTLED
+              ? 'tied'
+              : undefined
+          }
         />
       </dl>
 

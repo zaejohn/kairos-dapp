@@ -79,11 +79,27 @@ export const useKairos = (): UseKairos => {
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [tx, setTx] = useState<TxPhase>({ kind: 'idle' });
-  const [myPosition, setMyPosition] = useState<KairosPrivateState | null>(null);
+
+  // A filed position is only meaningful for the market it was filed in. The
+  // market id is recorded alongside it so that once the market rolls over, the
+  // stale entry stops being reported as "your position" — otherwise the panel
+  // would claim a position exists in a market the user has not entered.
+  const [filed, setFiled] = useState<{
+    readonly position: KairosPrivateState;
+    readonly marketId: bigint;
+  } | null>(null);
 
   // midnight-js contract handles are imperative objects, not React state.
   const providersRef = useRef<KairosProviders | null>(null);
   const contractRef = useRef<Awaited<ReturnType<typeof findDeployedContract>> | null>(null);
+
+  // Latest observed market id. Held in a ref so a submit can tag its position
+  // with the market it was filed in without the callback being rebuilt on
+  // every indexer poll.
+  const marketIdRef = useRef<bigint | null>(null);
+  useEffect(() => {
+    marketIdRef.current = ledger?.marketId ?? null;
+  }, [ledger]);
 
   // The network id is process-global inside midnight-js and must be set before
   // any provider is constructed.
@@ -158,7 +174,7 @@ export const useKairos = (): UseKairos => {
     setWalletStatus('disconnected');
     setWalletError(null);
     setLedger(null);
-    setMyPosition(null);
+    setFiled(null);
     setTx({ kind: 'idle' });
   }, []);
 
@@ -215,12 +231,22 @@ export const useKairos = (): UseKairos => {
         return;
       }
 
+      const marketId = marketIdRef.current;
+      if (marketId === null) {
+        setTx({
+          kind: 'error',
+          label: 'Submit position',
+          message: 'Contract state has not loaded yet. Try again in a moment.',
+        });
+        return;
+      }
+
       await runCircuit('Submit private position', async () => {
         // A fresh secret and nonce per position. The secret derives the
         // nullifier; the nonce keeps the commitment hiding.
         const privateState = createKairosPrivateState({ side, weight });
         await providers.privateStateProvider.set(KAIROS_TAG, privateState);
-        setMyPosition(privateState);
+        setFiled({ position: privateState, marketId });
 
         return contract.callTx.submitPosition() as never;
       });
@@ -286,6 +312,11 @@ export const useKairos = (): UseKairos => {
     },
     [runCircuit],
   );
+
+  // Only report a position while the ledger is still on the market it was
+  // filed for.
+  const myPosition =
+    filed && ledger && filed.marketId === ledger.marketId ? filed.position : null;
 
   return {
     walletStatus,
