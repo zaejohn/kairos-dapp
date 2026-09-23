@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+
+/*
+ * KAIROS visual language.
+ *
+ * A dark, low-chroma treasury console. The only saturated colours are
+ * semantic: teal for side A, amber for side B, and a muted red for errors.
+ * Everything else is greyscale so the allocation bar and state chips carry
+ * the meaning rather than competing with decoration.
+ */
+@theme {
+  --color-surface: #0b0f14;
+  --color-surface-raised: #121821;
+  --color-surface-sunken: #080b0f;
+  --color-border-subtle: #1e2733;
+  --color-border-strong: #2c3947;
+
+  --color-ink: #e8eef5;
+  --color-ink-muted: #93a3b5;
+  --color-ink-faint: #61708400;
+
+  --color-side-a: #2dd4bf;
+  --color-side-b: #fbbf24;
+  --color-accent: #60a5fa;
+  --color-danger: #f87171;
+  --color-success: #34d399;
+
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+}
+
+html,
+body {
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numeric readouts line up column-wise across cards. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A subtle scanline texture that reads as "instrument panel" without noise. */
+.panel-grid {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--color-border-subtle) 40%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 100% 2.5rem;
+}

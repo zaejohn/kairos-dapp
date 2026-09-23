@@ -8,20 +8,16 @@ const nextConfig: NextConfig = {
   // so they must be bundled rather than treated as an external package.
   transpilePackages: [],
 
-  // `@midnight-ntwrk/ledger-v8` loads WebAssembly and reaches for Node built-ins
-  // in some code paths. None of those paths run in the browser, so they are
-  // stubbed out here to keep the client bundle buildable.
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        child_process: false,
-      };
-    }
-    return config;
+  // Next.js 16 builds with Turbopack by default. The client bundle pulls in
+  // `@midnight-ntwrk/ledger-v8`, which loads WebAssembly and references Node
+  // built-ins on paths that are never reached in the browser; Turbopack
+  // resolves these correctly without a custom webpack fallback.
+  turbopack: {
+    resolveAlias: {
+      // The indexer provider expects a named `WebSocket` export, which the
+      // package's browser build does not provide. See the shim for details.
+      'isomorphic-ws': './src/lib/shims/isomorphic-ws.ts',
+    },
   },
 };
 
