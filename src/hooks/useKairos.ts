@@ -15,7 +15,11 @@ import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 
 import { ledger as decodeLedger, type Ledger } from '@managed/kairos/contract/index.js';
 import { createKairosCompiledContract, KAIROS_TAG } from '@/lib/contract/compiled';
-import { createKairosPrivateState, type KairosPrivateState } from '@/lib/contract/witnesses';
+import {
+  createKairosPrivateState,
+  emptyKairosPrivateState,
+  type KairosPrivateState,
+} from '@/lib/contract/witnesses';
 import { connectWallet, type ConnectedWallet, WalletError } from '@/lib/midnight/wallet';
 import { buildKairosProviders, type KairosProviders } from '@/lib/midnight/providers';
 import {
@@ -158,6 +162,18 @@ export const useKairos = (): UseKairos => {
           compiledContract: compiled as never,
           contractAddress: contractAddress as never,
           privateStateId: KAIROS_TAG,
+          // `findDeployedContract` has two shapes: with `privateStateId` alone
+          // it requires state to *already* exist under that id, and with
+          // `initialPrivateState` it stores it. The private state provider is
+          // created fresh here, so it is necessarily empty at this point and
+          // the first form fails with "No private state found at private state
+          // ID 'kairos'". Seeding it with an empty position satisfies the
+          // store form and makes reconnecting work.
+          //
+          // An empty position is the correct seed: this browser holds no
+          // position until one is submitted, and submitPosition replaces this
+          // entry with the real (side, weight, nonce, secret) opening.
+          initialPrivateState: emptyKairosPrivateState(),
         });
         contractRef.current = found;
       }
