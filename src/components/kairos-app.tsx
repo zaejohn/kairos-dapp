@@ -7,6 +7,7 @@ import { connectLace, shortenAddress } from "@/lib/midnight/wallet";
 import { createOpening, isContractAddress, openingSaltBytes, parseResolutionBundle, type SavedOpening } from "@/lib/market/openings";
 import type { MarketSnapshot, PublicTxReceipt } from "@/lib/midnight/market-client";
 import { AppError } from "@/lib/errors/app-error";
+import { parseTradeAmount, tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
 
 const stations = [
   { label: "Rewards", target: "rewards", className: "station-rewards" },
@@ -28,7 +29,7 @@ function downloadOpening(opening: SavedOpening) {
 
 function shortError(error: unknown, fallback: string) {
   if (error instanceof AppError) return error.message;
-  if (error instanceof Error && /^(Opening|Every opening|Exactly eight|A valid Preprod)/.test(error.message)) return error.message;
+  if (error instanceof Error && /^(Opening|Every opening|Exactly eight|A valid Preprod|Enter a whole number|Trade amount)/.test(error.message)) return error.message;
   return fallback;
 }
 
@@ -45,6 +46,9 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
   const [password, setPassword] = useState("");
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [side, setSide] = useState<0 | 1>(0);
+  const [tradeSide, setTradeSide] = useState<QuoteSide>(0);
+  const [tradeDirection, setTradeDirection] = useState<TradeDirection>("buy");
+  const [tradeAmount, setTradeAmount] = useState("");
   const [prepared, setPrepared] = useState<SavedOpening | null>(null);
   const [saved, setSaved] = useState(false);
   const [bundle, setBundle] = useState("");
@@ -122,6 +126,10 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
     setMessage("Download the opening and keep it private. The resolver will need it later.");
   }
 
+  const tradeGross = /^[1-9][0-9]*$/.test(tradeAmount) && BigInt(tradeAmount) >= 100n && BigInt(tradeAmount) <= (1n << 64n) - 1n ? BigInt(tradeAmount) : null;
+  const tradeBps = snapshot && (tradeDirection === "buy" ? (tradeSide === 0 ? snapshot.buyFeeA : snapshot.buyFeeB) : (tradeSide === 0 ? snapshot.sellFeeA : snapshot.sellFeeB));
+  const displayedFee = tradeGross !== null && tradeBps !== null && tradeBps !== undefined ? tradeFee(tradeGross, tradeBps) : null;
+
   return (
     <main>
       <header className="topbar">
@@ -188,6 +196,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
             }, "Position submission failed. Check Lace, local proof server, DUST, and the round; keep your opening for retry.")}>{busy === "proving" ? "Proving and finalizing…" : "Submit commitment"}</button>
           </div>}
           <p className="fine-print">Eight commitments fill a round. One trusted resolver needs all eight opening files; it and its proof server see their contents.</p>
+          <a href="#trading">Explore contract-mediated trading ↗</a>
         </section>
 
         <section id="wallet" className="panel wallet-panel">
@@ -209,23 +218,63 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
           }}>{busy === "connecting" ? "Connecting…" : wallet ? "Clear local session" : "Connect Lace"}</button></div>
         </section>
 
+        <section id="trading" className="panel trading-panel">
+          <div className="panel-heading"><span className="section-index">03 / TRADING</span><span className="panel-state">{snapshot?.economyIssued ? "Issued" : "Awaiting genesis"}</span></div>
+          <h2>Quote the conviction</h2>
+          <p>Buy Quote A or B with NIGHT, or sell a quote back for NIGHT when its side reserve can cover redemption. Rates are one atomic unit to one before the displayed fee. KAI incentives are paid from fixed inventory while it lasts.</p>
+          <div className="side-select" role="group" aria-label="Trade direction">
+            <button type="button" className={tradeDirection === "buy" ? "selected" : ""} onClick={() => setTradeDirection("buy")}>Buy quote</button>
+            <button type="button" className={tradeDirection === "sell" ? "selected" : ""} onClick={() => setTradeDirection("sell")}>Sell quote</button>
+          </div>
+          <div className="side-select" role="group" aria-label="Trade quote side">
+            <button type="button" className={tradeSide === 0 ? "selected" : ""} onClick={() => setTradeSide(0)}>Quote A</button>
+            <button type="button" className={tradeSide === 1 ? "selected" : ""} onClick={() => setTradeSide(1)}>Quote B</button>
+          </div>
+          <label className="field-label" htmlFor="trade-amount">Gross amount in atomic units</label>
+          <input id="trade-amount" inputMode="numeric" value={tradeAmount} onChange={(event) => setTradeAmount(event.target.value)} placeholder="10000" />
+          <p>Fee: {displayedFee === null ? "enter a valid amount" : `${displayedFee} units (${tradeBps} bps)`}. {displayedFee !== null && tradeGross !== null ? `Net ${tradeDirection === "buy" ? "quote" : "NIGHT"}: ${tradeGross - displayedFee} units.` : ""}</p>
+          <div className="action-row">
+            {!snapshot?.economyIssued && <button type="button" className="button-secondary" disabled={Boolean(busy) || !snapshot || !wallet} onClick={() => void run("issuing", async () => {
+              const client = await getClient();
+              setReceipt(await client.initializeEconomy(contractAddress));
+              await refreshAfterFinalized(contractAddress);
+            }, "Token genesis did not finalize. Check Lace, proof server, and this contract.")}>{busy === "issuing" ? "Issuing…" : "Initialize fixed token economy"}</button>}
+            <button type="button" className="button-primary" disabled={Boolean(busy) || !snapshot?.economyIssued || !wallet || tradeGross === null} onClick={() => void run("trading", async () => {
+              const gross = parseTradeAmount(tradeAmount);
+              const client = await getClient();
+              setReceipt(await client.trade(contractAddress, tradeSide, tradeDirection, gross));
+              setTradeAmount("");
+              await refreshAfterFinalized(contractAddress);
+            }, "Trade did not finalize. Check Lace balances, quote inventory, side reserve, and proof server.")}>{busy === "trading" ? "Proving and finalizing…" : `${tradeDirection === "buy" ? "Buy" : "Sell"} Quote ${tradeSide === 0 ? "A" : "B"}`}</button>
+          </div>
+          <p className="fine-print">Trade side, amount, fee, and unshielded recipient are public. Wallet-to-wallet transfers bypass these fees. KAI has no redemption promise.</p>
+        </section>
+
         <section id="treasury" className="panel treasury-panel">
-          <div className="panel-heading"><span className="section-index">03 / TREASURY</span><span className="panel-state">Policy only</span></div>
+          <div className="panel-heading"><span className="section-index">04 / TREASURY</span><span className="panel-state">Internal allocation</span></div>
           <h2>One result, one target</h2>
-          <p>Resolution writes only the winning quote side and a 70/30 target. Ties retain the previous target. No token balances or external liquidity are moved by this contract.</p>
+          <p>Resolution sets the winning quote side and a 70/30 target. Anyone can apply that target to the internal NIGHT redemption limits. This changes which quote side can be redeemed, without moving assets to an external exchange.</p>
           <div className="allocation"><div style={{ width: `${snapshot?.targetA ?? 50}%` }} /><div style={{ width: `${snapshot?.targetB ?? 50}%` }} /></div>
           <div className="allocation-labels"><span>QUOTE A · {snapshot?.targetA ?? 50}%</span><span>QUOTE B · {snapshot?.targetB ?? 50}%</span></div>
-          <p className="fine-print">Three intended roles: Quote A, Quote B, and KAI incentive. Native assets and contract-mediated trading are not issued or enabled in this build.</p>
+          <p>Side reserves: A {snapshot?.reserveA.toString() ?? "—"} · B {snapshot?.reserveB.toString() ?? "—"} atomic NIGHT. Fee pool: {snapshot?.feePool.toString() ?? "—"}.</p>
+          <div className="action-row"><button type="button" className="button-secondary" disabled={Boolean(busy) || snapshot?.phase !== 2n || !wallet} onClick={() => void run("rebalancing", async () => {
+            const client = await getClient();
+            setReceipt(await client.rebalance(contractAddress));
+            await refreshAfterFinalized(contractAddress);
+          }, "Rebalance did not finalize. Refresh public state and retry.")}>{busy === "rebalancing" ? "Applying…" : "Apply resolved allocation"}</button></div>
+          <p className="fine-print">Quote redemption is conditional on its side reserve. The allocation call changes accounting limits; the contract retains custody of NIGHT.</p>
         </section>
 
         <section id="rewards" className="panel rewards-panel">
-          <div className="panel-heading"><span className="section-index">04 / REWARDS</span><span className="panel-state">Unavailable</span></div>
-          <h2>Rewards require revenue</h2>
-          <p>There is no fee route or reward pool yet. Kairos does not mint rewards for market signals or display an estimated claim.</p>
+          <div className="panel-heading"><span className="section-index">05 / REWARDS</span><span className="panel-state">Trade incentive</span></div>
+          <h2>KAI follows activity</h2>
+          <p>The contract mints one million KAI units into its own custody once. Eligible contract-mediated trades send the fee amount in KAI to the same unshielded recipient while inventory remains. No market-signal reward or claim route exists.</p>
+          <p>Distributed: {snapshot?.kaiDistributed.toString() ?? "—"} / 1000000 KAI atomic units.</p>
+          {snapshot?.economyIssued && <details className="token-colors"><summary>View public token colors</summary><p>Quote A <code>{snapshot.quoteAColor}</code></p><p>Quote B <code>{snapshot.quoteBColor}</code></p><p>KAI <code>{snapshot.kaiColor}</code></p></details>}
         </section>
 
         <section id="settings" className="panel settings-panel">
-          <div className="panel-heading"><span className="section-index">05 / SETTINGS</span><span className="panel-state">Diagnostics</span></div>
+          <div className="panel-heading"><span className="section-index">06 / SETTINGS</span><span className="panel-state">Diagnostics</span></div>
           <h2>Network and resolver</h2>
           <label className="field-label" htmlFor="contract-address">Preprod contract address</label>
           <input id="contract-address" value={contractAddress} onChange={(event) => {
@@ -263,7 +312,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
         </section>
 
         <section className="panel resolver-panel">
-          <div className="panel-heading"><span className="section-index">06 / RESOLUTION</span><span className="panel-state">Trusted resolver</span></div>
+          <div className="panel-heading"><span className="section-index">07 / RESOLUTION</span><span className="panel-state">Trusted resolver</span></div>
           <h2>Resolve the complete round</h2>
           <p>Paste a JSON array of eight opening files, in public commitment order. Verification checks each opening against its on-chain hash and publishes only the winner. The resolver learns every side.</p>
           <label className="field-label" htmlFor="opening-bundle">Private opening bundle</label>
@@ -284,7 +333,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
           }, "The next round did not finalize.")}>{busy === "advancing" ? "Starting…" : "Start next round"}</button></div>
         </section>
       </div>
-      <footer><span>KAIROS / MIDNIGHT PREPROD</span><span>Private signal · Public policy · Execution pending</span></footer>
+      <footer><span>KAIROS / MIDNIGHT PREPROD</span><span>Private signal · Public policy · Contract-custodied trading</span></footer>
     </main>
   );
 }

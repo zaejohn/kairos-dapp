@@ -58,6 +58,9 @@ h1 em { color:var(--gold); font-style:normal; }
 .allocation div:first-child { background:var(--gold); } .allocation div:last-child { background:var(--rust); }
 .allocation-labels { display:flex; justify-content:space-between; gap:15px; color:#e9c99a; font-size:11px; font-weight:800; letter-spacing:.08em; margin:11px 0 22px; }
 .rewards-panel { background:linear-gradient(100deg,#1d1710 0 65%,#0d0e0b77),url('/reference/rewards.png') right center / 25% auto no-repeat,#1a1510; }
+.token-colors { color:#e4c799; font-size:12px; margin-top:20px; }
+.token-colors summary { cursor:pointer; }
+.token-colors code { overflow-wrap:anywhere; }
 .field-label { display:block; margin-top:22px; margin-bottom:8px; color:var(--gold); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
 input:not([type="checkbox"]),textarea { width:100%; border:1px solid #856743; border-radius:0; background:#100d0a; color:#f7e9ce; padding:13px 14px; font:14px Arial,sans-serif; }
 input::placeholder,textarea::placeholder { color:#786d5b; } textarea { min-height:170px; resize:vertical; font-family:ui-monospace,Consolas,monospace; }

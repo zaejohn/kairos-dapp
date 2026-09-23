@@ -1,7 +1,8 @@
 pragma language_version 0.23;
 import CompactStandardLibrary;
 
-// Public: round, phase, commitment hashes/count, winner, and treasury targets.
+// Public: round, phase, commitment hashes/count, winner, treasury targets,
+// and the identities/supply status of the three transparent contract tokens.
 // Private circuit inputs: each side and random salt. The resolver must obtain
 // all eight openings; its proof server can see them. This contract does not
 // authenticate unique people or escrow a financial position.
@@ -23,6 +24,18 @@ export ledger phase: Uint<8>; // 0 open, 1 full, 2 resolved
 export ledger winner: Uint<8>; // 0 quote A, 1 quote B, 2 none/tie
 export ledger targetA: Uint<8>; // percentage policy, not executed liquidity
 export ledger targetB: Uint<8>;
+export ledger economyIssued: Boolean;
+export ledger quoteAColor: Bytes<32>;
+export ledger quoteBColor: Bytes<32>;
+export ledger kaiColor: Bytes<32>;
+export ledger reserveA: Uint<128>; // NIGHT allocated to quote A redemptions
+export ledger reserveB: Uint<128>; // NIGHT allocated to quote B redemptions
+export ledger feePool: Uint<128>; // NIGHT retained by the protocol
+export ledger kaiDistributed: Uint<128>; // public total paid from fixed genesis inventory
+export ledger buyFeeA: Uint<16>; // basis points for contract-mediated trades
+export ledger buyFeeB: Uint<16>;
+export ledger sellFeeA: Uint<16>;
+export ledger sellFeeB: Uint<16>;
 
 constructor() {
   round = 1;
@@ -31,6 +44,106 @@ constructor() {
   winner = 2;
   targetA = 50;
   targetB = 50;
+  economyIssued = false;
+  reserveA = 0;
+  reserveB = 0;
+  feePool = 0;
+  kaiDistributed = 0;
+  buyFeeA = 300;
+  buyFeeB = 300;
+  sellFeeA = 500;
+  sellFeeB = 500;
+}
+
+// Fixed-supply, contract-custodied genesis. Anyone may trigger the first mint,
+// but no caller receives tokens and later calls cannot inflate the supply.
+// Deliberately no assert: unshielded mints in fallible circuits may fail at
+// ledger submission even when compilation and proof generation succeed.
+export circuit initializeEconomy(): [] {
+  if (!economyIssued) {
+    quoteAColor = mintUnshieldedToken(
+      pad(32, "kairos:quote-a:v1"),
+      disclose(1000000 as Uint<64>),
+      left<ContractAddress, UserAddress>(kernel.self())
+    );
+    quoteBColor = mintUnshieldedToken(
+      pad(32, "kairos:quote-b:v1"),
+      disclose(1000000 as Uint<64>),
+      left<ContractAddress, UserAddress>(kernel.self())
+    );
+    kaiColor = mintUnshieldedToken(
+      pad(32, "kairos:kai:v1"),
+      disclose(1000000 as Uint<64>),
+      left<ContractAddress, UserAddress>(kernel.self())
+    );
+    economyIssued = true;
+  }
+}
+
+circuit checkFee(gross: Uint<64>, bps: Uint<16>, fee: Uint<64>): [] {
+  const product = gross * bps;
+  const lower = fee * (10000 as Uint<14>);
+  assert(lower <= product && product < lower + (10000 as Uint<14>), "incorrect fee");
+}
+
+// Transparent, contract-mediated 1:1 NIGHT/quote route. Wallet-to-wallet
+// transfers do not traverse these circuits and therefore pay no Kairos fee.
+export circuit buyQuote(side: Uint<8>, grossNight: Uint<64>, fee: Uint<64>, recipient: UserAddress): [] {
+  // Token type, amount, fee, and recipient are necessarily public for this
+  // unshielded route; these disclosures do not apply to private market votes.
+  const publicSide = disclose(side);
+  const publicGross = disclose(grossNight);
+  const publicFee = disclose(fee);
+  assert(economyIssued, "economy is not initialized");
+  assert(publicSide <= 1, "invalid quote side");
+  assert(publicGross >= 100, "buy amount is too small");
+  const gross = publicGross as Uint<128>;
+  const feeBps = publicSide == 0 ? buyFeeA : buyFeeB;
+  checkFee(publicGross, feeBps, publicFee);
+  const output = gross - (publicFee as Uint<128>);
+  const color = publicSide == 0 ? quoteAColor : quoteBColor;
+  assert(unshieldedBalanceGte(color, disclose(output)), "insufficient quote inventory");
+  receiveUnshielded(nativeToken(), gross);
+  sendUnshielded(color, disclose(output), right<ContractAddress, UserAddress>(disclose(recipient)));
+  // Fee-coupled, fixed-supply KAI incentive. Exhaustion never blocks a trade.
+  if (unshieldedBalanceGte(kaiColor, disclose(publicFee as Uint<128>))) {
+    sendUnshielded(kaiColor, disclose(publicFee as Uint<128>), right<ContractAddress, UserAddress>(disclose(recipient)));
+    kaiDistributed = (kaiDistributed + (publicFee as Uint<128>)) as Uint<128>;
+  }
+  if (publicSide == 0) {
+    reserveA = (reserveA + output) as Uint<128>;
+  } else {
+    reserveB = (reserveB + output) as Uint<128>;
+  }
+  feePool = (feePool + (publicFee as Uint<128>)) as Uint<128>;
+}
+
+export circuit sellQuote(side: Uint<8>, grossQuote: Uint<64>, fee: Uint<64>, recipient: UserAddress): [] {
+  const publicSide = disclose(side);
+  const publicGross = disclose(grossQuote);
+  const publicFee = disclose(fee);
+  assert(economyIssued, "economy is not initialized");
+  assert(publicSide <= 1, "invalid quote side");
+  assert(publicGross >= 100, "sell amount is too small");
+  const gross = publicGross as Uint<128>;
+  const feeBps = publicSide == 0 ? sellFeeA : sellFeeB;
+  checkFee(publicGross, feeBps, publicFee);
+  const payout = gross - (publicFee as Uint<128>);
+  const color = publicSide == 0 ? quoteAColor : quoteBColor;
+  assert((publicSide == 0 ? reserveA : reserveB) >= gross, "insufficient side reserve");
+  assert(unshieldedBalanceGte(nativeToken(), disclose(payout)), "insufficient NIGHT balance");
+  receiveUnshielded(color, gross);
+  sendUnshielded(nativeToken(), disclose(payout), right<ContractAddress, UserAddress>(disclose(recipient)));
+  if (unshieldedBalanceGte(kaiColor, disclose(publicFee as Uint<128>))) {
+    sendUnshielded(kaiColor, disclose(publicFee as Uint<128>), right<ContractAddress, UserAddress>(disclose(recipient)));
+    kaiDistributed = (kaiDistributed + (publicFee as Uint<128>)) as Uint<128>;
+  }
+  if (publicSide == 0) {
+    reserveA = (reserveA - gross) as Uint<128>;
+  } else {
+    reserveB = (reserveB - gross) as Uint<128>;
+  }
+  feePool = (feePool + (publicFee as Uint<128>)) as Uint<128>;
 }
 
 circuit commitment(currentRound: Uint<32>, side: Uint<8>, salt: Bytes<32>): Bytes<32> {
@@ -74,11 +187,32 @@ export circuit resolveRound(openings: Vector<8, Opening>): [] {
   if (outcome == 0) {
     targetA = 70;
     targetB = 30;
+    buyFeeA = 100;
+    buyFeeB = 500;
+    sellFeeA = 300;
+    sellFeeB = 700;
   } else if (outcome == 1) {
     targetA = 30;
     targetB = 70;
+    buyFeeA = 500;
+    buyFeeB = 100;
+    sellFeeA = 700;
+    sellFeeB = 300;
   }
   phase = 2;
+}
+
+// Anyone can execute the resolved policy. The candidate is proved to be the
+// floor of total NIGHT reserve * targetA / 100, so it is not an oracle input.
+export circuit rebalanceTreasury(candidateA: Uint<128>): [] {
+  const publicCandidate = disclose(candidateA);
+  assert(phase == 2, "round is not resolved");
+  const total = (reserveA + reserveB) as Uint<128>;
+  const scaled = total * targetA;
+  const lower = publicCandidate * (100 as Uint<7>);
+  assert(lower <= scaled && scaled < lower + (100 as Uint<7>), "incorrect target allocation");
+  reserveA = publicCandidate;
+  reserveB = (total - publicCandidate) as Uint<128>;
 }
 
 export circuit startNextRound(): [] {

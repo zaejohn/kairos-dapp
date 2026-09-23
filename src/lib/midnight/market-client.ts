@@ -9,15 +9,18 @@ import { levelPrivateStateProvider } from "@midnight-ntwrk/midnight-js-level-pri
 import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js";
 import { Transaction, type FinalizedTransaction } from "@midnight-ntwrk/midnight-js-protocol/ledger";
+import { encodeUserAddress } from "@midnight-ntwrk/compact-runtime";
+import { MidnightBech32m, UnshieldedAddress } from "@midnight-ntwrk/wallet-sdk-address-format";
 import type { MidnightProvider, MidnightProviders, UnboundTransaction, WalletProvider } from "@midnight-ntwrk/midnight-js-types";
 import { fromHex, parseCoinPublicKeyToHex, parseEncPublicKeyToHex, PasswordValidationError, toHex, validatePassword } from "@midnight-ntwrk/midnight-js-utils";
 import { Contract, ledger, type Opening } from "../../../contracts/managed/kairos/contract/index.js";
 import { AppError } from "@/lib/errors/app-error";
+import { tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
 
 const INDEXER_HTTP = "https://indexer.preprod.midnight.network/api/v4/graphql";
 const INDEXER_WS = "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
 const PROOF_SERVER = "http://127.0.0.1:6301";
-type CircuitId = "commitPosition" | "resolveRound" | "startNextRound";
+type CircuitId = "commitPosition" | "resolveRound" | "startNextRound" | "initializeEconomy" | "buyQuote" | "sellQuote" | "rebalanceTreasury";
 
 export interface MarketSnapshot {
   round: bigint;
@@ -26,6 +29,18 @@ export interface MarketSnapshot {
   winner: bigint;
   targetA: bigint;
   targetB: bigint;
+  economyIssued: boolean;
+  quoteAColor: string;
+  quoteBColor: string;
+  kaiColor: string;
+  reserveA: bigint;
+  reserveB: bigint;
+  feePool: bigint;
+  kaiDistributed: bigint;
+  buyFeeA: bigint;
+  buyFeeB: bigint;
+  sellFeeA: bigint;
+  sellFeeB: bigint;
 }
 
 export interface PublicTxReceipt {
@@ -46,6 +61,18 @@ export async function readPublicMarket(contractAddress: string): Promise<MarketS
     winner: view.winner,
     targetA: view.targetA,
     targetB: view.targetB,
+    economyIssued: view.economyIssued,
+    quoteAColor: toHex(view.quoteAColor),
+    quoteBColor: toHex(view.quoteBColor),
+    kaiColor: toHex(view.kaiColor),
+    reserveA: view.reserveA,
+    reserveB: view.reserveB,
+    feePool: view.feePool,
+    kaiDistributed: view.kaiDistributed,
+    buyFeeA: view.buyFeeA,
+    buyFeeB: view.buyFeeB,
+    sellFeeA: view.sellFeeA,
+    sellFeeB: view.sellFeeB,
   };
 }
 
@@ -127,6 +154,16 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
     return findDeployedContract(providers, { compiledContract, contractAddress });
   }
 
+  async function payoutAddress() {
+    const { unshieldedAddress } = await api.getUnshieldedAddress();
+    try {
+      const decoded = MidnightBech32m.parse(unshieldedAddress).decode(UnshieldedAddress, "preprod");
+      return { bytes: encodeUserAddress(decoded.hexString) };
+    } catch (cause) {
+      throw new AppError("UNSHIELDED_ADDRESS_INVALID", "Lace returned an invalid Preprod unshielded address.", { cause });
+    }
+  }
+
   return {
     snapshot: readPublicMarket,
     async deploy() {
@@ -147,6 +184,32 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
     async startNextRound(contractAddress: string): Promise<PublicTxReceipt> {
       const contract = await found(contractAddress);
       const result = await contract.callTx.startNextRound();
+      return { txId: result.public.txId, blockHeight: result.public.blockHeight };
+    },
+    async initializeEconomy(contractAddress: string): Promise<PublicTxReceipt> {
+      const contract = await found(contractAddress);
+      const result = await contract.callTx.initializeEconomy();
+      return { txId: result.public.txId, blockHeight: result.public.blockHeight };
+    },
+    async trade(contractAddress: string, side: QuoteSide, direction: TradeDirection, gross: bigint): Promise<PublicTxReceipt> {
+      if (gross < 100n || gross > (1n << 64n) - 1n) throw new AppError("TRADE_AMOUNT_INVALID", "Enter 100 or more atomic units within the Uint64 limit.");
+      const state = await readPublicMarket(contractAddress);
+      if (!state.economyIssued) throw new AppError("ECONOMY_NOT_INITIALIZED", "Initialize the Kairos token economy first.");
+      const bps = direction === "buy" ? (side === 0 ? state.buyFeeA : state.buyFeeB) : (side === 0 ? state.sellFeeA : state.sellFeeB);
+      const fee = tradeFee(gross, bps);
+      const recipient = await payoutAddress();
+      const contract = await found(contractAddress);
+      const result = direction === "buy"
+        ? await contract.callTx.buyQuote(BigInt(side), gross, fee, recipient)
+        : await contract.callTx.sellQuote(BigInt(side), gross, fee, recipient);
+      return { txId: result.public.txId, blockHeight: result.public.blockHeight };
+    },
+    async rebalance(contractAddress: string): Promise<PublicTxReceipt> {
+      const state = await readPublicMarket(contractAddress);
+      if (state.phase !== 2n) throw new AppError("ROUND_NOT_RESOLVED", "Resolve the round before rebalancing.");
+      const targetA = (state.reserveA + state.reserveB) * state.targetA / 100n;
+      const contract = await found(contractAddress);
+      const result = await contract.callTx.rebalanceTreasury(targetA);
       return { txId: result.public.txId, blockHeight: result.public.blockHeight };
     },
   };
