@@ -10,7 +10,7 @@
 
 1. Start the app as described in the README and check the proof server in Settings.
 2. Connect Lace and confirm it is on Preprod. Set a strong local storage password in Settings. Keep this password safe; it protects Midnight signing-key storage in this browser.
-3. Load a verified Preprod contract address in Settings. If you are the operator and no address exists, use **Deploy new Preprod contract** and record the finalized address and transaction ID. The first round closes seven days after deployment was requested; confirm the public close time in the status strip. A deployment is real only after the app shows a finalized receipt and public state can be read.
+3. Load a verified Preprod contract address in Settings. If you are the operator and no address exists, use **Deploy new Preprod contract** and record the finalized address and transaction ID. Run `npm run verify:preprod -- <address> <transaction-id>` to check the indexer result and current eight-circuit artifact. The first round closes seven days after deployment was requested; confirm the public close time in the status strip. A deployment is real only after the app shows a finalized receipt and public state can be read.
 4. In an open round, choose Quote A or Quote B and select **Prepare private opening**. Download the JSON opening. Keep it private and backed up.
 5. Acknowledge that you saved it, then submit the commitment through Lace. Keep the opening even if the app shows an error until you verify whether the transaction finalized.
 6. Before the public close time, send each opening to the trusted resolver through a private channel. Each file contains its side and salt. The resolver orders all eight by public commitment index and pastes their JSON objects as one array into the resolution panel.
@@ -32,6 +32,7 @@ Token issuance, trade side, gross amount, fee, payout address, reserve values, a
 - **Wrong network:** switch Lace to Midnight Preprod, then reconnect.
 - **Proof server unavailable:** run `npm run proof:up` and `npm run proof:status`; the browser must reach `http://127.0.0.1:6301/health`. Lace's own local-proving setting may also require a trusted service at `localhost:6300`.
 - **No public state:** confirm the 64-character address belongs to a deployed Preprod contract, then retry after indexer propagation.
+- **Verifier rejects the address:** confirm that the transaction ID belongs to that deployment and that the browser was refreshed after the latest contract compile. An older Kairos deployment needs its matching older artifacts and cannot verify as the current build.
 - **Proof or submission error:** retain the opening file, check DUST, Lace prompts, proof server health, and the current round before retrying. Inspect the public contract state before assuming a failed transaction.
 - **Round advanced before submission:** the contract rejects an opening made for an older round. Load the new round and prepare a fresh opening.
 - **Resolution fails:** provide exactly eight valid opening objects in commitment order, all for this contract and round. A missing or altered salt cannot be recovered by Kairos.

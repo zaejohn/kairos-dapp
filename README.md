@@ -54,6 +54,14 @@ Node.js 22, npm, Docker, Compact compiler 0.31.1, a Preprod Lace wallet for tran
 
 The app has no server-held wallet keys. The browser encrypts local Midnight signing-key storage using the password you supply. It is not a recovery phrase. Never send opening files to an untrusted resolver.
 
+After a deployment finalizes, verify the address and receipt against the Preprod indexer and this build's verifier keys:
+
+```text
+npm run verify:preprod -- <contract-address> <deployment-transaction-id>
+```
+
+The command reports public state only. It cannot verify a missing address or substitute for a successful wallet transaction.
+
 ## Run Tests
 
 ```text

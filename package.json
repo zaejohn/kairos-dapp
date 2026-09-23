@@ -23,6 +23,7 @@
     "proof:logs": "docker compose -f infra/midnight/proof-server.yml logs -f proof-server",
     "proof:status": "node scripts/midnight/check-proof-server.mjs",
     "proof:smoke": "node scripts/midnight/smoke-local-proofs.mjs",
+    "verify:preprod": "node scripts/midnight/verify-preprod-deployment.mjs",
     "compact:version": "compact compile --version",
     "compact:compile": "node scripts/midnight/compile-contracts.mjs",
     "agent:doctor": "node scripts/agent/doctor.mjs",
