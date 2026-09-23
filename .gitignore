@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+dist/
+build/
+
+# testing
+coverage/
+
+# tooling caches
+*.tsbuildinfo
+.eslintcache
+.vitest/
+
+# environment — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+
+# NOTE: ./managed is intentionally NOT ignored.
+# The compiled contract artifacts (contract bindings, zkir, prover and verifier
+# keys) are required at runtime for proof generation, so they are versioned to
+# keep the repository self-contained. Regenerate them with `npm run compile`.
