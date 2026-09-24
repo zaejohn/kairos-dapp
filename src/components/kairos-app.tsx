@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import type { WalletConnection, WalletOption } from "@/lib/midnight/wallet";
 import {
   connectMidnightWallet,
@@ -34,6 +35,8 @@ import {
   type TradeDirection,
 } from "@/lib/market/trading";
 import { allocationMatchesTarget } from "@/lib/market/allocation";
+import { NightMarketChart } from "@/components/night-market-chart";
+import { ToastViewport, type ToastKind, type ToastNotice } from "@/components/toast-viewport";
 
 const stations = [
   { label: "Rewards", target: "rewards", className: "hotspot-rewards" },
@@ -42,6 +45,13 @@ const stations = [
   { label: "Wallet", target: "wallet", className: "hotspot-wallet" },
   { label: "Treasury", target: "scrap", className: "hotspot-scrap" },
 ] as const;
+
+const nightTokenType = nativeToken().raw;
+
+function compactWalletAddress(address: string): string {
+  if (address.length <= 33) return address;
+  return `${address.slice(0, 24)}…${address.slice(-8)}`;
+}
 
 type Station = (typeof stations)[number]["target"];
 type PositionPreview = Pick<
@@ -126,8 +136,6 @@ export function KairosApp({
   >("idle");
   const [walletOptions, setWalletOptions] = useState<WalletOption[]>([]);
   const [walletDetecting, setWalletDetecting] = useState(false);
-  const [walletError, setWalletError] = useState<string | null>(null);
-  const [walletMessage, setWalletMessage] = useState<string | null>(null);
   const [additionalAddresses, setAdditionalAddresses] = useState<{
     unshielded: string;
     dust: string;
@@ -155,24 +163,41 @@ export function KairosApp({
   );
   const [importedPosition, setImportedPosition] =
     useState<PositionPreview | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [bundle, setBundle] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [transactionProgress, setTransactionProgress] =
-    useState<TransactionProgress | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastNotice[]>([]);
   const [receipt, setReceipt] = useState<PublicTxReceipt | null>(null);
   const [proofStatus, setProofStatus] = useState<
     "unknown" | "ready" | "unavailable"
   >("unknown");
   const [nowSeconds, setNowSeconds] = useState(0);
   const transactionProgressRef = useRef<TransactionProgress | null>(null);
+  const toastId = useRef(0);
+  const progressToastId = useRef<number | null>(null);
+  const lastRunErrorToastId = useRef<number | null>(null);
+  const noWalletToastShown = useRef(false);
+  const noWalletToastId = useRef<number | null>(null);
+  const walletDetectionToastId = useRef<number | null>(null);
   const activeAddress = useRef(contractAddress);
   const loadGeneration = useRef(0);
   const walletBalanceGeneration = useRef(0);
+  const addressGeneration = useRef(0);
   const dialogRef = useRef<HTMLDialogElement>(null);
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((current) => current.filter((notice) => notice.id !== id));
+  }, []);
+
+  const showToast = useCallback((kind: ToastKind, message: string, detail?: string, persistent = false, key?: string) => {
+    const id = ++toastId.current;
+    setToasts((current) => [...current.filter((notice) => !key || notice.key !== key), { id, kind, message, detail, persistent, key }]);
+    return id;
+  }, []);
+
+  const notifyChart = useCallback((kind: ToastKind, message: string) => {
+    showToast(kind, message, undefined, false, "chart-feed");
+  }, [showToast]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -193,7 +218,11 @@ export function KairosApp({
           if (!cancelled) setWalletOptions([]);
         })
         .finally(() => {
-          if (!cancelled) setWalletDetecting(false);
+          if (!cancelled) {
+            setWalletDetecting(false);
+            if (walletDetectionToastId.current !== null) dismissToast(walletDetectionToastId.current);
+            walletDetectionToastId.current = null;
+          }
         });
     };
     detect();
@@ -201,8 +230,22 @@ export function KairosApp({
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      if (walletDetectionToastId.current !== null) dismissToast(walletDetectionToastId.current);
+      walletDetectionToastId.current = null;
     };
-  }, [active, wallet, walletStatus]);
+  }, [active, wallet, walletStatus, dismissToast]);
+
+  useEffect(() => {
+    if (wallet || walletOptions.length > 0) {
+      if (noWalletToastId.current !== null) dismissToast(noWalletToastId.current);
+      noWalletToastId.current = null;
+      noWalletToastShown.current = false;
+      return;
+    }
+    if (active !== "wallet" || wallet || walletDetecting || walletStatus === "connecting" || walletOptions.length > 0 || noWalletToastShown.current) return;
+    noWalletToastShown.current = true;
+    noWalletToastId.current = showToast("warning", "No compatible Midnight wallets detected. Install or unlock a Preprod wallet, then reopen Wallet.");
+  }, [active, wallet, walletDetecting, walletOptions.length, walletStatus, showToast, dismissToast]);
 
   useEffect(() => {
     const update = () => setNowSeconds(Math.floor(Date.now() / 1000));
@@ -213,7 +256,27 @@ export function KairosApp({
 
   function reportTransactionProgress(progress: TransactionProgress | null) {
     transactionProgressRef.current = progress;
-    setTransactionProgress(progress);
+    if (!progress) {
+      if (progressToastId.current !== null) dismissToast(progressToastId.current);
+      progressToastId.current = null;
+      return;
+    }
+    const detail = progress.submittedTxId
+      ? `Submitted transaction ID: ${progress.submittedTxId}. Check Preprod before retrying if finalization stays pending.`
+      : undefined;
+    if (progressToastId.current === null) {
+      progressToastId.current = showToast("info", transactionStageText[progress.stage], detail, true);
+    } else {
+      const id = progressToastId.current;
+      setToasts((current) => current.map((notice) => notice.id === id
+        ? { ...notice, message: transactionStageText[progress.stage], detail }
+        : notice));
+    }
+  }
+
+  function recordFinalizedReceipt(next: PublicTxReceipt, message = "Transaction finalized on Preprod.") {
+    setReceipt(next);
+    showToast("success", message, `Block ${next.blockHeight} · Transaction ${next.txId}`);
   }
 
   async function getClient() {
@@ -232,13 +295,13 @@ export function KairosApp({
     if (walletStatus === "connecting") return;
     // Start the extension request while this button click still has user activation.
     const connection = connectMidnightWallet(option, "preprod");
-    setWalletError(null);
-    setWalletMessage(null);
+    const waitingToastId = showToast("info", `Waiting for ${option.name} approval… ${option.name === "1AM" ? "Check the browser side panel." : "Unlock the wallet and approve the site request."}`, undefined, true, "wallet-connection");
     setWalletStatus("connecting");
     setBusy("connecting");
     void connection
       .then((connected) => {
         setWallet(connected);
+        addressGeneration.current++;
         setAdditionalAddresses(null);
         setAddressStatus("idle");
         setWalletStatus("connected");
@@ -246,69 +309,69 @@ export function KairosApp({
         setWalletBalances(null);
         setWalletBalanceStatus("idle");
         setActive(null);
+        showToast("success", `${connected.name} connected on Midnight Preprod.`, undefined, false, "wallet-connection");
       })
       .catch((cause: unknown) => {
         setWalletStatus("failed");
-        setWalletError(
-          shortError(
-            cause,
-            `${option.name} connection failed. Retry in the wallet.`,
-          ),
-        );
+        showToast("error", shortError(cause, `${option.name} connection failed. Retry in the wallet.`), undefined, false, "wallet-connection");
         setActive("wallet");
       })
-      .finally(() => setBusy(null));
+      .finally(() => {
+        dismissToast(waitingToastId);
+        setBusy(null);
+      });
   }
 
   function openStation(station: Station) {
     if (station === "wallet" && !wallet) {
       setWalletOptions([]);
       setWalletDetecting(true);
-      setWalletError(null);
+      walletDetectionToastId.current = showToast("info", "Detecting Midnight wallets on Preprod…", undefined, true, "wallet-detection-progress");
+    }
+    if ((station === "wallet" || station === "settings") && wallet && walletBalanceStatus === "idle") {
+      void refreshWalletBalances();
     }
     setActive(station);
   }
 
-  async function copyWalletAddress() {
-    if (!wallet) return;
+  async function copyWalletAddress(address: string, label: string) {
     try {
-      await navigator.clipboard.writeText(wallet.shieldedAddress);
-      setWalletMessage("Shielded address copied.");
-      setWalletError(null);
+      await navigator.clipboard.writeText(address);
+      showToast("success", `${label} address copied.`, undefined, false, "address-copy");
     } catch {
-      setWalletError("Could not copy the address. Select and copy it below.");
+      showToast("error", "Could not copy the address. Check browser clipboard permissions and retry.", undefined, false, "address-copy");
     }
   }
 
   function revealAdditionalAddresses() {
     if (!wallet || addressStatus === "loading") return;
-    const generation = walletBalanceGeneration.current;
+    const generation = addressGeneration.current;
     setAddressStatus("loading");
-    setWalletError(null);
     void Promise.all([
           wallet.api.getUnshieldedAddress(),
           wallet.api.getDustAddress(),
         ])
       .then(([unshielded, dust]) => {
-        if (generation !== walletBalanceGeneration.current) return;
+        if (generation !== addressGeneration.current) return;
         if (!unshielded.unshieldedAddress || !dust.dustAddress) {
           throw new AppError("WALLET_ADDRESS_MISSING", "The wallet did not return both additional addresses.");
         }
         setAdditionalAddresses({ unshielded: unshielded.unshieldedAddress, dust: dust.dustAddress });
         setAddressStatus("idle");
+        showToast("success", "Unshielded and DUST addresses loaded. Click either address to copy it.", undefined, false, "addresses");
       })
       .catch((cause: unknown) => {
-        if (generation !== walletBalanceGeneration.current) return;
+        if (generation !== addressGeneration.current) return;
         setAddressStatus("failed");
-        setWalletError(shortError(cause, "The wallet did not provide unshielded and DUST addresses. Check wallet permissions and retry."));
+        showToast("error", shortError(cause, "The wallet did not provide unshielded and DUST addresses. Check wallet permissions and retry."), undefined, false, "addresses");
       });
   }
 
-  async function refreshWalletBalances() {
+  async function refreshWalletBalances(manual = false) {
     if (!wallet) return;
     const generation = ++walletBalanceGeneration.current;
     setWalletBalanceStatus("loading");
-    setWalletError(null);
+    setToasts((current) => current.filter((notice) => notice.key !== "wallet-balance"));
     try {
       const balances = await wallet.api.getUnshieldedBalances();
       if (
@@ -321,17 +384,20 @@ export function KairosApp({
       if (generation === walletBalanceGeneration.current) {
         setWalletBalances(balances);
         setWalletBalanceStatus("ready");
+        if (manual) showToast("success", Object.keys(balances).length === 0 ? "The wallet reported no unshielded token balances." : "Unshielded wallet balances updated.", undefined, false, "wallet-balance");
       }
     } catch {
       if (generation === walletBalanceGeneration.current) {
         setWalletBalances(null);
         setWalletBalanceStatus("failed");
+        showToast("error", "The wallet could not return unshielded balances. Check its connection and retry.", undefined, false, "wallet-balance");
       }
     }
   }
 
   function disconnectWallet() {
     setWallet(null);
+    addressGeneration.current++;
     setAdditionalAddresses(null);
     setAddressStatus("idle");
     setWalletStatus("idle");
@@ -348,17 +414,12 @@ export function KairosApp({
     setPrepared(null);
     setSessionPositions([]);
     setImportedPosition(null);
-    setImportError(null);
     setSaved(false);
     setBundle("");
     setReceipt(null);
-    setError(null);
-    setMessage(null);
     reportTransactionProgress(null);
-    setWalletMessage(
-      "Kairos session disconnected. Revoke site access in your wallet if needed.",
-    );
-    setWalletError(null);
+    setToasts([]);
+    showToast("info", "Kairos session disconnected. Revoke site access in your wallet if needed.");
   }
 
   async function run(
@@ -368,8 +429,8 @@ export function KairosApp({
   ) {
     setBusy(label);
     reportTransactionProgress(null);
-    setError(null);
-    setMessage(null);
+    if (lastRunErrorToastId.current !== null) dismissToast(lastRunErrorToastId.current);
+    lastRunErrorToastId.current = null;
     try {
       await work();
     } catch (cause) {
@@ -378,9 +439,7 @@ export function KairosApp({
         ? transactionFailureText[progress.stage]
         : failure;
       const submittedId = progress?.submittedTxId;
-      setError(
-        `${shortError(cause, fallback)}${submittedId ? ` Submitted transaction ID: ${submittedId}.` : ""}`,
-      );
+      lastRunErrorToastId.current = showToast("error", shortError(cause, fallback), submittedId ? `Submitted transaction ID: ${submittedId}.` : undefined);
     } finally {
       reportTransactionProgress(null);
       setBusy(null);
@@ -390,7 +449,7 @@ export function KairosApp({
   async function refresh(address = contractAddress) {
     if (!isContractAddress(address)) {
       setSnapshot(null);
-      throw new Error("A valid Preprod contract address is required.");
+      throw new AppError("CONTRACT_NOT_CONFIGURED", "This site has no valid Preprod contract configured. Contact the operator.");
     }
     const generation = ++loadGeneration.current;
     const { readPublicMarket } = await import("@/lib/midnight/market-client");
@@ -414,7 +473,7 @@ export function KairosApp({
     try {
       await refresh(address);
     } catch {
-      setMessage(
+      showToast("warning",
         "Transaction finalized, but the indexer has not returned the latest state. Load public state again shortly.",
       );
     }
@@ -440,11 +499,11 @@ export function KairosApp({
             activeAddress.current === initialContractAddress
           ) {
             setSnapshot(null);
-            setError("Could not load the configured Preprod contract. Check the address and Preprod indexer, then retry in Settings.");
+            showToast("error", "Could not load the configured Preprod contract. Retry Load public state in Settings; if it persists, contact the operator.");
           }
         });
     }
-  }, [initialContractAddress]);
+  }, [initialContractAddress, showToast]);
 
   function prepare() {
     if (
@@ -453,23 +512,21 @@ export function KairosApp({
       nowSeconds >= Number(snapshot.roundCloseAt) ||
       !isContractAddress(contractAddress)
     ) {
-      setError("Load an open Preprod round before preparing a position.");
+      showToast("warning", "Load an open Preprod round before preparing a position.");
       return;
     }
     setPrepared(createOpening(contractAddress, Number(snapshot.round), side));
     setSaved(false);
-    setError(null);
-    setMessage(
+    showToast("info",
       "Download the opening and keep it private. The resolver will need it later.",
     );
   }
 
   async function previewOpeningFile(file: File | undefined) {
     if (!file) return;
-    setImportError(null);
     setImportedPosition(null);
     if (file.size > 16_384) {
-      setImportError(
+      showToast("error",
         "Opening file is too large. Select a Kairos opening JSON file.",
       );
       return;
@@ -481,8 +538,9 @@ export function KairosApp({
         round: opening.round,
         side: opening.side,
       });
+      showToast("info", "Opening preview loaded locally. This file is not verified on-chain.");
     } catch {
-      setImportError(
+      showToast("error",
         "The selected file is not a valid Kairos opening JSON file.",
       );
     }
@@ -534,41 +592,6 @@ export function KairosApp({
 
   return (
     <main>
-      <header className="app-header">
-        <div className="app-brand">
-          <strong>KAIROS</strong>
-          <span>PRIVATE SIGNAL · PUBLIC DIRECTION</span>
-        </div>
-        <div className="app-header-actions">
-          <span className="network-pill">MIDNIGHT PREPROD</span>
-          <button
-            type="button"
-            className="header-wallet"
-            onClick={() => openStation("wallet")}
-          >
-            {wallet
-              ? `${wallet.name} · shielded ${shortenAddress(wallet.shieldedAddress, 5)}`
-              : walletStatus === "connecting"
-                ? "Connecting wallet…"
-                : "Connect wallet"}
-          </button>
-        </div>
-      </header>
-      <section className="app-intro" aria-labelledby="app-title">
-        <div>
-          <p className="eyebrow">THE WEEKLY MARKET</p>
-          <h1 id="app-title">
-            Conviction in private.
-            <br />
-            <em>Direction in public.</em>
-          </h1>
-        </div>
-        <p>
-          Choose a quote side privately, then follow the public result as Kairos
-          adjusts contract-held NIGHT reserves and trading fees. The resolver
-          sees submitted openings; trades are public.
-        </p>
-      </section>
       <div className="home-artwork">
         <Image
           src="/reference/home-image.png"
@@ -602,16 +625,11 @@ export function KairosApp({
           </button>
         ))}
       </nav>
-      <section className="mechanism-strip" aria-label="How Kairos works">
-        <span>01 / Private position</span>
-        <span>02 / Weekly result</span>
-        <span>03 / Treasury allocation</span>
-        <span>04 / Contract trading</span>
-      </section>
       <footer>
-        <span>KAIROS / MIDNIGHT PREPROD</span>
+        <span>KAIROS</span>
         <span>Private signal · Public policy · Contract-custodied trading</span>
       </footer>
+      {!active && <ToastViewport notices={toasts} onDismiss={dismissToast} />}
 
       <dialog
         ref={dialogRef}
@@ -668,31 +686,6 @@ export function KairosApp({
           </section>
         )}
 
-        {active &&
-          active !== "wallet" &&
-          (error || message || receipt || transactionProgress) && (
-            <div className="notification" role={error ? "alert" : "status"}>
-              {error && <p className="error-text">{error}</p>}
-              {message && <p>{message}</p>}
-              {transactionProgress && (
-                <p>{transactionStageText[transactionProgress.stage]}</p>
-              )}
-              {transactionProgress?.submittedTxId && (
-                <p>
-                  Submitted transaction ID:{" "}
-                  <code>{transactionProgress.submittedTxId}</code>. Check
-                  Preprod before retrying if finalization stays pending.
-                </p>
-              )}
-              {receipt && (
-                <p>
-                  Last finalized transaction in block {receipt.blockHeight}:{" "}
-                  <code>{receipt.txId}</code>
-                </p>
-              )}
-            </div>
-          )}
-
         <div className="dialog-content">
           {active === "trading" && (
             <section id="market" className="panel feature-panel">
@@ -747,7 +740,10 @@ export function KairosApp({
                   <button
                     type="button"
                     className="button-secondary"
-                    onClick={() => downloadOpening(prepared)}
+                    onClick={() => {
+                      downloadOpening(prepared);
+                      showToast("success", "Opening download started. Keep the file private for resolution.");
+                    }}
                   >
                     Download opening
                   </button>
@@ -779,7 +775,7 @@ export function KairosApp({
                             BigInt(prepared.side),
                             openingSaltBytes(prepared),
                           );
-                          setReceipt(result);
+                          recordFinalizedReceipt(result, "Commitment finalized on Preprod. Keep your opening file private.");
                           setSessionPositions((current) =>
                             [
                               {
@@ -828,11 +824,6 @@ export function KairosApp({
                     event.target.value = "";
                   }}
                 />
-                {importError && (
-                  <p className="error-text" role="alert">
-                    {importError}
-                  </p>
-                )}
                 {importedPosition && (
                   <div className="position-row">
                     <span>Imported file · Unverified on-chain</span>
@@ -880,25 +871,46 @@ export function KairosApp({
             <div className="wallet-options">
               {wallet ? (
                 <div className="wallet-account">
-                  <span className="eyebrow">CONNECTED TO PREPROD</span>
+                  <span className="eyebrow">CONNECTED NETWORK · MIDNIGHT {wallet.networkId.toUpperCase()}</span>
                   <strong>{wallet.name}</strong>
-                  <label className="field-label" htmlFor="wallet-address">
-                    Your shielded address
-                  </label>
-                  <textarea
-                    id="wallet-address"
-                    readOnly
-                    value={wallet.shieldedAddress}
-                    rows={3}
-                  />
+                  <div className="wallet-balance-summary">
+                    <span className="field-label">Unshielded NIGHT balance · atomic units</span>
+                    <strong>
+                      {walletBalanceStatus === "loading"
+                        ? "Reading wallet…"
+                        : walletBalanceStatus === "ready"
+                          ? walletBalances?.[nightTokenType]?.toString() ?? "No NIGHT balance reported"
+                          : "Balance unavailable"}
+                    </strong>
+                    <button type="button" disabled={walletBalanceStatus === "loading"} onClick={() => void refreshWalletBalances(true)}>
+                      Refresh balance
+                    </button>
+                  </div>
+                  <span className="field-label">Your shielded address</span>
+                  <button
+                    type="button"
+                    className="wallet-address-copy"
+                    title="Copy full shielded address"
+                    aria-label="Copy full shielded address"
+                    onClick={() => void copyWalletAddress(wallet.shieldedAddress, "Shielded")}
+                  >
+                    <span>{compactWalletAddress(wallet.shieldedAddress)}</span>
+                    <span aria-hidden="true">COPY</span>
+                  </button>
                   <p className="fine-print">Kairos uses the shielded public keys for contract calls. The wallet balances and signs the deployment transaction.</p>
                   {additionalAddresses ? (
                     <>
-                      <label className="field-label" htmlFor="wallet-unshielded-address">Your unshielded address</label>
-                      <textarea id="wallet-unshielded-address" readOnly value={additionalAddresses.unshielded} rows={3} />
+                      <span className="field-label">Your unshielded address</span>
+                      <button type="button" className="wallet-address-copy" title="Copy full unshielded address" aria-label="Copy full unshielded address" onClick={() => void copyWalletAddress(additionalAddresses.unshielded, "Unshielded")}>
+                        <span>{compactWalletAddress(additionalAddresses.unshielded)}</span>
+                        <span aria-hidden="true">COPY</span>
+                      </button>
                       <p className="fine-print">Use this address for Preprod NIGHT funding. Kairos also uses it as the recipient for public quote token trades.</p>
-                      <label className="field-label" htmlFor="wallet-dust-address">Your DUST address</label>
-                      <textarea id="wallet-dust-address" readOnly value={additionalAddresses.dust} rows={3} />
+                      <span className="field-label">Your DUST address</span>
+                      <button type="button" className="wallet-address-copy" title="Copy full DUST address" aria-label="Copy full DUST address" onClick={() => void copyWalletAddress(additionalAddresses.dust, "DUST")}>
+                        <span>{compactWalletAddress(additionalAddresses.dust)}</span>
+                        <span aria-hidden="true">COPY</span>
+                      </button>
                       <p className="fine-print">The wallet manages DUST when paying network fees for contract transactions.</p>
                     </>
                   ) : (
@@ -907,12 +919,6 @@ export function KairosApp({
                     </button>
                   )}
                   <div className="action-row">
-                    <button
-                      type="button"
-                      onClick={() => void copyWalletAddress()}
-                    >
-                      Copy shielded address
-                    </button>
                     <button
                       type="button"
                       disabled={Boolean(busy)}
@@ -939,23 +945,8 @@ export function KairosApp({
                       {option.name}
                     </button>
                   ))}
-                  {walletStatus === "connecting" && (
-                    <span role="status">Waiting for wallet approval… 1AM may open in the browser side panel.</span>
-                  )}
-                  {walletDetecting &&
-                    walletOptions.length === 0 &&
-                    walletStatus !== "connecting" && (
-                      <span role="status">Detecting wallets…</span>
-                    )}
-                  {!walletDetecting &&
-                    walletOptions.length === 0 &&
-                    walletStatus !== "connecting" && (
-                      <span role="status">No compatible wallets detected.</span>
-                    )}
                 </>
               )}
-              {walletMessage && <span role="status">{walletMessage}</span>}
-              {walletError && <span role="alert">{walletError}</span>}
             </div>
           )}
 
@@ -992,6 +983,7 @@ export function KairosApp({
                   </strong>
                 </div>
               </div>
+              <NightMarketChart onNotify={notifyChart} />
               <div
                 className="side-select"
                 role="group"
@@ -1081,8 +1073,9 @@ export function KairosApp({
                         "issuing",
                         async () => {
                           const client = await getClient();
-                          setReceipt(
+                          recordFinalizedReceipt(
                             await client.initializeEconomy(contractAddress),
+                            "Kairos token economy initialized on Preprod.",
                           );
                           await refreshAfterFinalized(contractAddress);
                         },
@@ -1110,13 +1103,14 @@ export function KairosApp({
                       async () => {
                         const gross = parseTradeAmount(tradeAmount);
                         const client = await getClient();
-                        setReceipt(
+                        recordFinalizedReceipt(
                           await client.trade(
                             contractAddress,
                             tradeSide,
                             tradeDirection,
                             gross,
                           ),
+                          "Trade finalized on Preprod.",
                         );
                         setTradeAmount("");
                         await refreshAfterFinalized(contractAddress);
@@ -1213,7 +1207,7 @@ export function KairosApp({
                       "rebalancing",
                       async () => {
                         const client = await getClient();
-                        setReceipt(await client.rebalance(contractAddress));
+                        recordFinalizedReceipt(await client.rebalance(contractAddress), "Target allocation restored on Preprod.");
                         await refreshAfterFinalized(contractAddress);
                       },
                       "Rebalance did not finalize. Refresh public state and retry.",
@@ -1239,8 +1233,8 @@ export function KairosApp({
                 </div>
                 {!snapshot && (
                   <p>
-                    Load a verified Preprod contract in Settings to read its
-                    public history.
+                    Public history appears when the configured Preprod market
+                    state loads.
                   </p>
                 )}
                 {snapshot && snapshot.recentTreasuryActions.length === 0 && (
@@ -1362,9 +1356,9 @@ export function KairosApp({
             <section id="settings" className="panel settings-panel">
               <div className="panel-heading">
                 <span className="section-index">06 / SETTINGS</span>
-                <span className="panel-state">Diagnostics</span>
+                <span className="panel-state">Midnight Preprod</span>
               </div>
-              <h2>Network and resolver</h2>
+              <h2>Wallet and transaction setup</h2>
               <div className="settings-wallet">
                 <span className="field-label">Wallet session</span>
                 <strong>
@@ -1385,27 +1379,22 @@ export function KairosApp({
               <div className="settings-wallet">
                 <span className="field-label">Unshielded wallet balances</span>
                 <p>
-                  Read directly from your connected wallet. Token labels appear
-                  only when they match the loaded Kairos contract colors.
+                  Read directly from your connected wallet. NIGHT is the native
+                  token; other labels require matching loaded Kairos contract
+                  colors. Amounts are shown in atomic units.
                 </p>
                 <div className="action-row">
                   <button
                     type="button"
                     className="button-secondary"
                     disabled={!wallet || walletBalanceStatus === "loading"}
-                    onClick={() => void refreshWalletBalances()}
+                    onClick={() => void refreshWalletBalances(true)}
                   >
                     {walletBalanceStatus === "loading"
                       ? "Reading wallet…"
                       : "Refresh wallet balances"}
                   </button>
                 </div>
-                {walletBalanceStatus === "failed" && (
-                  <p role="alert" className="error-text">
-                    The wallet could not return unshielded balances. Check its
-                    connection and retry.
-                  </p>
-                )}
                 {walletBalanceStatus === "ready" && walletBalances && (
                   <div className="wallet-balance-list">
                     {Object.entries(walletBalances).length === 0 ? (
@@ -1418,11 +1407,13 @@ export function KairosApp({
                         .map(([type, amount]) => (
                           <div key={type}>
                             <span>
-                              {snapshot?.economyIssued &&
-                              type.toLowerCase() ===
-                                snapshot.quoteAColor.toLowerCase()
-                                ? "Quote A"
+                              {type.toLowerCase() === nightTokenType
+                                ? "NIGHT"
                                 : snapshot?.economyIssued &&
+                                    type.toLowerCase() ===
+                                      snapshot.quoteAColor.toLowerCase()
+                                  ? "Quote A"
+                                  : snapshot?.economyIssued &&
                                     type.toLowerCase() ===
                                       snapshot.quoteBColor.toLowerCase()
                                   ? "Quote B"
@@ -1439,26 +1430,6 @@ export function KairosApp({
                   </div>
                 )}
               </div>
-              <label className="field-label" htmlFor="contract-address">
-                Preprod contract address
-              </label>
-              <input
-                id="contract-address"
-                value={contractAddress}
-                onChange={(event) => {
-                  const next = event.target.value.trim();
-                  activeAddress.current = next;
-                  loadGeneration.current++;
-                  setContractAddress(next);
-                  setSnapshot(null);
-                  setPrepared(null);
-                  setSaved(false);
-                  setBundle("");
-                }}
-                placeholder="64-character contract address"
-                autoComplete="off"
-                spellCheck={false}
-              />
               <div className="action-row">
                 <button
                   type="button"
@@ -1471,7 +1442,7 @@ export function KairosApp({
                       "refreshing",
                       async () => {
                         await refresh();
-                        setMessage("Public Preprod state loaded.");
+                        showToast("success", "Public Preprod state loaded.");
                       },
                       "Could not read this contract from the Preprod indexer.",
                     )
@@ -1480,6 +1451,12 @@ export function KairosApp({
                   {busy === "refreshing" ? "Loading…" : "Load public state"}
                 </button>
               </div>
+              {!isContractAddress(contractAddress) && (
+                <p className="fine-print">
+                  This site does not have a Preprod market configured yet. The
+                  site operator must configure one before trading is available.
+                </p>
+              )}
               <label className="field-label" htmlFor="local-password">
                 Local storage password
               </label>
@@ -1492,38 +1469,12 @@ export function KairosApp({
                 autoComplete="new-password"
               />
               <p className="fine-print">
-                Used in this browser to encrypt Midnight signing keys. It is
-                never sent to Kairos. Keep it safe; changing it may make
-                existing local keys inaccessible.
+                Required on this device for Kairos transactions. It encrypts
+                Midnight signing keys in this browser and is never sent to
+                Kairos. Keep it safe; changing it may make existing local keys
+                inaccessible.
               </p>
               <div className="action-row">
-                <button
-                  type="button"
-                  className="button-secondary"
-                  disabled={Boolean(busy) || !wallet}
-                  onClick={() =>
-                    void run(
-                      "deploying",
-                      async () => {
-                        const client = await getClient();
-                        const deployed = await client.deploy();
-                        activeAddress.current = deployed.contractAddress;
-                        loadGeneration.current++;
-                        setContractAddress(deployed.contractAddress);
-                        setReceipt(deployed.receipt);
-                        setMessage(
-                          "Kairos contract finalized on Preprod. Save its public address.",
-                        );
-                        await refreshAfterFinalized(deployed.contractAddress);
-                      },
-                      "Deployment did not finalize. Check the local proof server, browser Local Network Access permission, wallet, and DUST.",
-                    )
-                  }
-                >
-                  {busy === "deploying"
-                    ? "Deploying and finalizing…"
-                    : "Deploy new Preprod contract"}
-                </button>
                 <button
                   type="button"
                   className="button-secondary"
@@ -1540,7 +1491,7 @@ export function KairosApp({
                           if (!health.ok || !version.ok || !(await version.text()).includes("8.1.0"))
                             throw new Error("proof server unavailable or wrong version");
                           setProofStatus("ready");
-                          setMessage("The proof server on this device responded.");
+                          showToast("success", "The proof server on this device responded.");
                         } catch (cause) {
                           setProofStatus("unavailable");
                           throw cause;
@@ -1559,6 +1510,63 @@ export function KairosApp({
                 hosted. Your browser may ask to allow Local Network Access.
                 Private openings stay on this device when using that server.
               </p>
+              {process.env.NODE_ENV !== "production" && (
+                <details className="settings-wallet developer-settings">
+                  <summary>Local developer controls</summary>
+                  <p className="fine-print">
+                    For local replacement deployments and diagnostics only. The
+                    public site uses its configured, verified Preprod contract.
+                  </p>
+                  <label className="field-label" htmlFor="contract-address">
+                    Preprod contract address
+                  </label>
+                  <input
+                    id="contract-address"
+                    value={contractAddress}
+                    onChange={(event) => {
+                      const next = event.target.value.trim();
+                      activeAddress.current = next;
+                      loadGeneration.current++;
+                      setContractAddress(next);
+                      setSnapshot(null);
+                      setPrepared(null);
+                      setSaved(false);
+                      setBundle("");
+                    }}
+                    placeholder="64-character contract address"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <div className="action-row">
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      disabled={Boolean(busy) || !wallet}
+                      onClick={() =>
+                        void run(
+                          "deploying",
+                          async () => {
+                            const client = await getClient();
+                            const deployed = await client.deploy();
+                            activeAddress.current = deployed.contractAddress;
+                            loadGeneration.current++;
+                            setContractAddress(deployed.contractAddress);
+                            recordFinalizedReceipt(deployed.receipt,
+                              "Kairos contract finalized on Preprod. Save its public address.",
+                            );
+                            await refreshAfterFinalized(deployed.contractAddress);
+                          },
+                          "Deployment did not finalize. Check the local proof server, browser Local Network Access permission, wallet, and DUST.",
+                        )
+                      }
+                    >
+                      {busy === "deploying"
+                        ? "Deploying and finalizing…"
+                        : "Deploy new Preprod contract"}
+                    </button>
+                  </div>
+                </details>
+              )}
             </section>
           )}
 
@@ -1606,7 +1614,7 @@ export function KairosApp({
                           contractAddress,
                           openings,
                         );
-                        setReceipt(result);
+                        recordFinalizedReceipt(result, "Weekly round resolved on Preprod.");
                         setBundle("");
                         await refreshAfterFinalized(contractAddress);
                       },
@@ -1632,8 +1640,9 @@ export function KairosApp({
                       "advancing",
                       async () => {
                         const client = await getClient();
-                        setReceipt(
+                        recordFinalizedReceipt(
                           await client.startNextRound(contractAddress),
+                          "Next weekly round started on Preprod.",
                         );
                         await refreshAfterFinalized(contractAddress);
                       },
@@ -1652,7 +1661,7 @@ export function KairosApp({
                       "expiring",
                       async () => {
                         const client = await getClient();
-                        setReceipt(await client.expire(contractAddress));
+                        recordFinalizedReceipt(await client.expire(contractAddress), "Missed round expired on Preprod.");
                         await refreshAfterFinalized(contractAddress);
                       },
                       "Expiry failed. The one-day resolution window may still be open; load public state and retry.",
@@ -1671,6 +1680,7 @@ export function KairosApp({
             </section>
           )}
         </div>
+        {active && <ToastViewport notices={toasts} onDismiss={dismissToast} />}
       </dialog>
     </main>
   );

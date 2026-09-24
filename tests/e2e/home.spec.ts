@@ -1,14 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-test("shows the workshop, product context, and usable station navigation", async ({ page }) => {
+test("shows only the workshop and footer on desktop, with usable image stations", async ({ page }) => {
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await expect(page.getByRole("img", { name: /Kairos workshop/ })).toBeVisible();
   await expect(page.locator("main > footer")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Conviction in private/ })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Kairos stations" })).toBeVisible();
+  await expect(page.locator("main > .home-artwork")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Kairos stations" })).toBeHidden();
   await page.getByRole("button", { name: "Open Trading Engine" }).click();
   await expect(page.getByRole("heading", { name: "Commit your market view" })).toBeVisible();
+  await expect(page.getByRole("figure", { name: "Live NIGHT/USDT spot candlestick chart" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Market status" }).locator("strong").first()).toHaveCSS("color", "rgb(255, 241, 214)");
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await expect(page.getByText("No compatible wallets detected.")).toBeVisible();
@@ -16,8 +18,10 @@ test("shows the workshop, product context, and usable station navigation", async
 });
 
 test("mobile station navigation opens the matching dialogs", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto("/");
+  await expect(page.getByRole("navigation", { name: "Kairos stations" })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForLoadState("networkidle");
   await page.getByRole("navigation", { name: "Kairos stations" }).getByRole("button", { name: /Treasury/ }).click();
   await expect(page.getByRole("dialog", { name: "Treasury" })).toBeVisible();
@@ -101,6 +105,7 @@ test("loads verifier keys and reaches wallet balancing without repeating status 
   await page.getByRole("button", { name: "LACE", exact: true }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
   await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
+  await page.getByText("Local developer controls").click();
   await page.getByRole("button", { name: "Deploy new Preprod contract" }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { walletStatusChecks: () => number }).walletStatusChecks())).toBe(1);
   await expect(page.getByRole("alert").filter({ hasText: "The wallet could not balance or authorize the transaction" })).toBeVisible();
@@ -118,6 +123,7 @@ test("queries the Preprod indexer with browser fetch", async ({ page }) => {
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Open Settings" }).click();
+  await page.getByText("Local developer controls").click();
   await page.getByLabel("Preprod contract address").fill("a".repeat(64));
   await page.getByRole("button", { name: "Load public state" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "Kairos contract was not found on Preprod" })).toBeVisible();
@@ -175,6 +181,7 @@ test("lists both injected wallets and connects only the selected provider", asyn
   await expect(page.getByRole("button", { name: "Open Wallet" })).toBeEnabled();
   await expect(page.getByRole("dialog", { name: "Wallet" })).not.toBeVisible();
   await page.getByRole("button", { name: "Open Wallet" }).click();
+  await expect(page.getByText("CONNECTED NETWORK · MIDNIGHT PREPROD")).toBeVisible();
   await expect(page.getByLabel("Your shielded address")).toHaveValue("test-shielded-address");
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
@@ -185,7 +192,7 @@ test("lists both injected wallets and connects only the selected provider", asyn
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await page.getByRole("button", { name: "Disconnect in Kairos" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Kairos session disconnected" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "1AM", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
   await expect(page.getByLabel("Local storage password")).toBeEmpty();

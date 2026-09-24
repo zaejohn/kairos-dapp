@@ -52,6 +52,7 @@ it("ignores an old contract response after the address changes", async () => {
   render(<KairosApp initialContractAddress={addressA} />);
   fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
   await waitFor(() => expect(readPublicMarket).toHaveBeenCalledWith(addressA));
+  fireEvent.click(screen.getByText("Local developer controls"));
   fireEvent.change(screen.getByLabelText("Preprod contract address"), { target: { value: addressB } });
   fireEvent.click(screen.getByRole("button", { name: "Load public state" }));
   await waitFor(() => expect(readPublicMarket).toHaveBeenCalledWith(addressB));

@@ -46,6 +46,7 @@
     "@midnight-ntwrk/midnight-js-types": "4.1.1",
     "@midnight-ntwrk/midnight-js-utils": "4.1.1",
     "@midnight-ntwrk/wallet-sdk-address-format": "3.1.2",
+    "lightweight-charts": "5.2.1",
     "next": "16.3.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
