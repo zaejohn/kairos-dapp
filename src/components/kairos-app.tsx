@@ -224,10 +224,15 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
             if (wallet) {
               setWallet(null);
               setPassword("");
+              setSide(0);
+              setTradeSide(0);
+              setTradeDirection("buy");
+              setTradeAmount("");
               setPrepared(null);
               setSaved(false);
               setBundle("");
               setReceipt(null);
+              setError(null);
               setMessage("Local session and private inputs cleared. Revoke site access in Lace if needed.");
               return;
             }
