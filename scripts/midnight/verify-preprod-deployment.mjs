@@ -13,6 +13,7 @@ const CIRCUITS = [
   "resolveRound", "expireRound", "rebalanceTreasury", "startNextRound",
 ];
 const HEX_32 = /^[0-9a-f]{64}$/i;
+const TX_IDENTIFIER = /^(?:[0-9a-f]{64}|[0-9a-f]{66})$/i;
 const DEPLOY_QUERY = `query Deployment($address: HexEncoded!) {
   contractAction(address: $address) {
     __typename
@@ -97,8 +98,8 @@ async function verify(address, txId) {
 }
 
 const [addressInput, txInput] = process.argv.slice(2);
-if (!addressInput || !txInput || !HEX_32.test(addressInput) || !HEX_32.test(txInput)) {
-  console.error("Usage: npm run verify:preprod -- <64-hex-contract-address> <64-hex-deployment-tx-id>");
+if (!addressInput || !txInput || !HEX_32.test(addressInput) || !TX_IDENTIFIER.test(txInput)) {
+  console.error("Usage: npm run verify:preprod -- <64-hex-contract-address> <64-or-66-hex-deployment-tx-id>");
   process.exitCode = 2;
 } else {
   verify(addressInput.toLowerCase(), txInput.toLowerCase())

@@ -62,6 +62,14 @@ npm run verify:preprod -- <contract-address> <deployment-transaction-id>
 
 The command reports public state only. It cannot verify a missing address or substitute for a successful wallet transaction.
 
+For a later finalized circuit call, check its transaction identifier against the exact contract address and expected entry point:
+
+```text
+npm run verify:activity -- <contract-address> <transaction-id> <Kairos-circuit-id>
+```
+
+This read-only check confirms a successful call on Preprod. It does not prove that a particular person used the app or that token balances changed by an expected amount. Verify the deployment first, then inspect public state and balances for any economic claim.
+
 ## Run Tests
 
 ```text
