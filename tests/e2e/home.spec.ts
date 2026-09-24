@@ -36,6 +36,61 @@ test("explains Lace's Preprod network mismatch", async ({ page }) => {
   await expect(page.getByRole("alert").filter({ hasText: "Switch Lace to preprod and retry" })).toBeVisible();
 });
 
+test("shows provider preparation while deployment waits on the connected wallet", async ({ page }) => {
+  await page.addInitScript(() => {
+    let checks = 0;
+    Object.defineProperty(window, "midnight", {
+      value: {
+        lace: {
+          rdns: "io.lace.wallet",
+          apiVersion: "4.0.1",
+          connect: async () => ({
+            getConnectionStatus: async () => {
+              checks += 1;
+              if (checks === 1) return { status: "connected", networkId: "preprod" };
+              return new Promise(() => {});
+            },
+            getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address" }),
+          }),
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Connect Lace" }).click();
+  await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
+  await page.getByRole("button", { name: "Deploy new Preprod contract" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Preparing wallet keys and contract providers" })).toBeVisible();
+});
+
+test("reports a preparation failure without claiming a transaction was submitted", async ({ page }) => {
+  await page.addInitScript(() => {
+    let checks = 0;
+    Object.defineProperty(window, "midnight", {
+      value: {
+        lace: {
+          rdns: "io.lace.wallet",
+          apiVersion: "4.0.1",
+          connect: async () => ({
+            getConnectionStatus: async () => {
+              checks += 1;
+              if (checks === 1) return { status: "connected", networkId: "preprod" };
+              throw new Error("Wallet service unavailable");
+            },
+            getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address" }),
+          }),
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Connect Lace" }).click();
+  await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
+  await page.getByRole("button", { name: "Deploy new Preprod contract" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Wallet or provider setup failed" })).toBeVisible();
+  await expect(page.getByText("Submitted transaction ID:")).toHaveCount(0);
+});
+
 test("clearing a Lace session removes private inputs from the page", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "midnight", {

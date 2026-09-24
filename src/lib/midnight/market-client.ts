@@ -17,6 +17,7 @@ import { Contract, ledger, type Opening } from "../../../contracts/managed/kairo
 import { AppError } from "@/lib/errors/app-error";
 import { tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
 import { targetAfterResolution, targetReserveA } from "@/lib/market/allocation";
+import { withTransactionProgress, type TransactionProgress } from "@/lib/midnight/transaction-progress";
 
 const INDEXER_HTTP = "https://indexer.preprod.midnight.network/api/v4/graphql";
 const INDEXER_WS = "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
@@ -115,7 +116,7 @@ function walletProvider(api: ConnectedAPI): WalletProvider & MidnightProvider & 
   };
 }
 
-export async function createMarketClient(api: ConnectedAPI, accountId: string, password: string) {
+export async function createMarketClient(api: ConnectedAPI, accountId: string, password: string, onProgress: (progress: TransactionProgress) => void = () => {}) {
   if (typeof window === "undefined") throw new AppError("BROWSER_ONLY", "The market is available only in a browser.");
   try {
     validatePassword(password);
@@ -134,6 +135,11 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
   await adapter.loadKeys();
   const zkConfigProvider = new FetchZkConfigProvider<CircuitId>(`${window.location.origin}/zk/kairos`);
   const publicDataProvider = indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS);
+  const transactionProviders = withTransactionProgress({
+    proofProvider: httpClientProofProvider(PROOF_SERVER, zkConfigProvider),
+    walletProvider: adapter,
+    midnightProvider: adapter,
+  }, onProgress);
   const providers: MidnightProviders<CircuitId, "kairos", undefined> = {
     privateStateProvider: levelPrivateStateProvider<"kairos", undefined>({
       accountId,
@@ -144,9 +150,7 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
     }),
     publicDataProvider,
     zkConfigProvider,
-    proofProvider: httpClientProofProvider(PROOF_SERVER, zkConfigProvider),
-    walletProvider: adapter,
-    midnightProvider: adapter,
+    ...transactionProviders,
   };
   const compiledContract = CompiledContract.withCompiledFileAssets(
     CompiledContract.withVacantWitnesses(CompiledContract.make<Contract<undefined>, undefined>("kairos", Contract)),

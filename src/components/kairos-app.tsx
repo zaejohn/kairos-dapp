@@ -6,6 +6,7 @@ import type { LaceConnection } from "@/lib/midnight/wallet";
 import { connectLace, shortenAddress } from "@/lib/midnight/wallet";
 import { createOpening, isContractAddress, openingSaltBytes, parseResolutionBundle, type SavedOpening } from "@/lib/market/openings";
 import type { MarketSnapshot, PublicTxReceipt } from "@/lib/midnight/market-client";
+import type { TransactionProgress, TransactionStage } from "@/lib/midnight/transaction-progress";
 import { AppError } from "@/lib/errors/app-error";
 import { parseTradeAmount, tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
 import { allocationMatchesTarget } from "@/lib/market/allocation";
@@ -17,6 +18,22 @@ const stations = [
   { label: "Wallet", target: "wallet", className: "station-wallet" },
   { label: "Treasury", target: "treasury", className: "station-treasury" },
 ] as const;
+
+const transactionStageText: Record<TransactionStage, string> = {
+  preparing: "Preparing wallet keys and contract providers…",
+  proving: "Generating a proof with the local server…",
+  balancing: "Balancing in Lace; approve if prompted…",
+  submitting: "Submitting through Lace…",
+  finalizing: "Waiting for Preprod finalization…",
+};
+
+const transactionFailureText: Record<TransactionStage, string> = {
+  preparing: "Wallet or provider setup failed. Check the local password and Lace connection, then retry.",
+  proving: "Local proving failed. Check the Kairos proof server, generated artifacts, and circuit inputs.",
+  balancing: "Lace could not balance or authorize the transaction. Check DUST and wallet prompts before retrying.",
+  submitting: "Lace reported a submission error. Check wallet history and public state before retrying.",
+  finalizing: "Preprod finalization could not be confirmed. Check the submitted transaction ID before retrying.",
+};
 
 function downloadOpening(opening: SavedOpening) {
   const blob = new Blob([JSON.stringify(opening, null, 2)], { type: "application/json" });
@@ -57,11 +74,13 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
   const [saved, setSaved] = useState(false);
   const [bundle, setBundle] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [transactionProgress, setTransactionProgress] = useState<TransactionProgress | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<PublicTxReceipt | null>(null);
   const [proofStatus, setProofStatus] = useState<"unknown" | "ready" | "unavailable">("unknown");
   const [nowSeconds, setNowSeconds] = useState(0);
+  const transactionProgressRef = useRef<TransactionProgress | null>(null);
   const activeAddress = useRef(contractAddress);
   const loadGeneration = useRef(0);
 
@@ -72,21 +91,32 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
     return () => window.clearInterval(timer);
   }, []);
 
+  function reportTransactionProgress(progress: TransactionProgress | null) {
+    transactionProgressRef.current = progress;
+    setTransactionProgress(progress);
+  }
+
   async function getClient() {
     if (!wallet) throw new AppError("WALLET_REQUIRED", "Connect Lace first.");
+    reportTransactionProgress({ stage: "preparing" });
     const { createMarketClient } = await import("@/lib/midnight/market-client");
-    return createMarketClient(wallet.api, wallet.shieldedAddress, password);
+    return createMarketClient(wallet.api, wallet.shieldedAddress, password, reportTransactionProgress);
   }
 
   async function run(label: string, work: () => Promise<void>, failure: string) {
     setBusy(label);
+    reportTransactionProgress(null);
     setError(null);
     setMessage(null);
     try {
       await work();
     } catch (cause) {
-      setError(shortError(cause, failure));
+      const progress = transactionProgressRef.current;
+      const fallback = progress ? transactionFailureText[progress.stage] : failure;
+      const submittedId = progress?.submittedTxId;
+      setError(`${shortError(cause, fallback)}${submittedId ? ` Submitted transaction ID: ${submittedId}.` : ""}`);
     } finally {
+      reportTransactionProgress(null);
       setBusy(null);
     }
   }
@@ -106,6 +136,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
   }
 
   async function refreshAfterFinalized(address: string) {
+    reportTransactionProgress(null);
     try {
       await refresh(address);
     } catch {
@@ -182,9 +213,11 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
         <div><span>TARGET A / B</span><strong>{snapshot ? `${snapshot.targetA}% / ${snapshot.targetB}%` : "—"}</strong></div>
       </section>
 
-      {(error || message || receipt) && <div className="notification" role={error ? "alert" : "status"}>
+      {(error || message || receipt || transactionProgress) && <div className="notification" role={error ? "alert" : "status"}>
         {error && <p className="error-text">{error}</p>}
         {message && <p>{message}</p>}
+        {transactionProgress && <p>{transactionStageText[transactionProgress.stage]}</p>}
+        {transactionProgress?.submittedTxId && <p>Submitted transaction ID: <code>{transactionProgress.submittedTxId}</code>. Check Preprod before retrying if finalization stays pending.</p>}
         {receipt && <p>Last finalized transaction in block {receipt.blockHeight}: <code>{receipt.txId}</code></p>}
       </div>}
 
