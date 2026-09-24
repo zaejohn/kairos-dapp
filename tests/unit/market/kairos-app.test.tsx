@@ -57,7 +57,7 @@ it("shows the treasury step when a resolved round has unapplied reserves", async
   const address = "a".repeat(64);
   readPublicMarket.mockResolvedValue({ ...publicState(1n), phase: 2n, targetA: 70n, targetB: 30n, reserveA: 9_700n, reserveB: 9_700n });
   render(<KairosApp initialContractAddress={address} />);
-  expect(await screen.findByText("Apply the resolved allocation in Treasury before starting the next round.")).toBeInTheDocument();
+  expect(await screen.findByText("Restore the target allocation in Treasury after intervening trades before starting the next round.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Start next round" })).toBeDisabled();
 });
 

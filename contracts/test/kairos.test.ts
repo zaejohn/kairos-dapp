@@ -40,6 +40,16 @@ function setup() {
     if (ledger(context.currentQueryContext.state).economyIssued) settleBalances();
     else context = createCircuitContext(contractAddress, coinPublicKey, context.currentQueryContext.state, {}, undefined, undefined, now);
   }
+  function targetCandidate(targetA: bigint) {
+    const view = ledger(context.currentQueryContext.state);
+    return ((view.reserveA + view.reserveB) * targetA) / 100n;
+  }
+  function resolutionCandidate(values: Opening[]) {
+    const forA = values.filter((value) => value.side === 0n).length;
+    const forB = values.filter((value) => value.side === 1n).length;
+    const targetA = forA > forB ? 70n : forB > forA ? 30n : ledger(context.currentQueryContext.state).targetA;
+    return targetCandidate(targetA);
+  }
   return {
     contract,
     state: () => ledger(context.currentQueryContext.state),
@@ -51,13 +61,16 @@ function setup() {
     },
     resolve(values: Opening[]) {
       if (ledger(context.currentQueryContext.state).phase === 1n) setTime(Number(ledger(context.currentQueryContext.state).roundCloseAt));
-      context = contract.circuits.resolveRound(context, values).context;
+      context = contract.circuits.resolveRound(context, values, resolutionCandidate(values)).context;
     },
     resolveNow(values: Opening[]) {
-      context = contract.circuits.resolveRound(context, values).context;
+      context = contract.circuits.resolveRound(context, values, resolutionCandidate(values)).context;
+    },
+    resolveWithCandidate(values: Opening[], candidateA: bigint) {
+      context = contract.circuits.resolveRound(context, values, candidateA).context;
     },
     expire() {
-      context = contract.circuits.expireRound(context).context;
+      context = contract.circuits.expireRound(context, targetCandidate(ledger(context.currentQueryContext.state).targetA)).context;
     },
     next() {
       context = contract.circuits.startNextRound(context).context;
@@ -122,6 +135,18 @@ describe("Kairos bounded private market", () => {
     expect(() => market.resolveNow(positions)).toThrow(/resolution window expired/);
     market.expire();
     expect([market.state().winner, market.state().targetA, market.state().targetB]).toEqual([2n, 50n, 50n]);
+  });
+
+  it("restores the existing target when an incomplete round expires", () => {
+    const market = setup();
+    market.issueEconomy();
+    market.buy(0n, 10_000n, 300n);
+    market.commit(opening(0n, 1));
+    market.at(FIRST_CLOSE + 86_400);
+    market.expire();
+    expect([market.state().reserveA, market.state().reserveB, market.state().feePool]).toEqual([4_850n, 4_850n, 300n]);
+    market.next();
+    expect(market.state().round).toBe(2n);
   });
 
   it("publishes only commitments until a complete round resolves", () => {
@@ -204,11 +229,10 @@ describe("Kairos bounded private market", () => {
     market.buy(1n, 10000n, 300n);
     const positions = Array.from({ length: 8 }, (_, index) => opening(index < 5 ? 0n : 1n, index + 1));
     positions.forEach(market.commit);
+    market.at(FIRST_CLOSE);
+    expect(() => market.resolveWithCandidate(positions, 13579n)).toThrow(/incorrect target allocation/);
     market.resolve(positions);
     expect([market.state().buyFeeA, market.state().buyFeeB, market.state().sellFeeA, market.state().sellFeeB]).toEqual([100n, 500n, 300n, 700n]);
-    expect(() => market.next()).toThrow(/treasury target is not applied/);
-    expect(() => market.rebalance(13579n)).toThrow();
-    market.rebalance(13580n);
     expect([market.state().reserveA, market.state().reserveB, market.state().feePool]).toEqual([13580n, 5820n, 600n]);
     market.buy(0n, 10000n, 100n);
     expect(() => market.next()).toThrow(/treasury target is not applied/);

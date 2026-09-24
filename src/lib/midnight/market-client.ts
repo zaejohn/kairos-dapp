@@ -16,7 +16,7 @@ import { fromHex, parseCoinPublicKeyToHex, parseEncPublicKeyToHex, PasswordValid
 import { Contract, ledger, type Opening } from "../../../contracts/managed/kairos/contract/index.js";
 import { AppError } from "@/lib/errors/app-error";
 import { tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
-import { targetReserveA } from "@/lib/market/allocation";
+import { targetAfterResolution, targetReserveA } from "@/lib/market/allocation";
 
 const INDEXER_HTTP = "https://indexer.preprod.midnight.network/api/v4/graphql";
 const INDEXER_WS = "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
@@ -181,13 +181,20 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
       return { txId: result.public.txId, blockHeight: result.public.blockHeight };
     },
     async resolve(contractAddress: string, openings: Opening[]): Promise<PublicTxReceipt> {
+      const state = await readPublicMarket(contractAddress);
+      const forA = openings.filter((opening) => opening.side === 0n).length;
+      const forB = openings.filter((opening) => opening.side === 1n).length;
+      const targetA = targetAfterResolution(forA, forB, state.targetA);
+      const candidateA = targetReserveA(state.reserveA, state.reserveB, targetA);
       const contract = await found(contractAddress);
-      const result = await contract.callTx.resolveRound(openings);
+      const result = await contract.callTx.resolveRound(openings, candidateA);
       return { txId: result.public.txId, blockHeight: result.public.blockHeight };
     },
     async expire(contractAddress: string): Promise<PublicTxReceipt> {
+      const state = await readPublicMarket(contractAddress);
+      const candidateA = targetReserveA(state.reserveA, state.reserveB, state.targetA);
       const contract = await found(contractAddress);
-      const result = await contract.callTx.expireRound();
+      const result = await contract.callTx.expireRound(candidateA);
       return { txId: result.public.txId, blockHeight: result.public.blockHeight };
     },
     async startNextRound(contractAddress: string): Promise<PublicTxReceipt> {

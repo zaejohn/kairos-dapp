@@ -78,13 +78,13 @@ try {
   }
   now = firstClose;
   settleBalances();
-  await prove("resolveRound", contract.circuits.resolveRound(context, openings));
+  await prove("resolveRound", contract.circuits.resolveRound(context, openings, 490n));
   await prove("rebalanceTreasury", contract.circuits.rebalanceTreasury(context, 490n));
   await prove("startNextRound", contract.circuits.startNextRound(context));
 
   now = firstClose + 604_800 + 86_400;
   settleBalances();
-  await prove("expireRound", contract.circuits.expireRound(context));
+  await prove("expireRound", contract.circuits.expireRound(context, 490n));
 
   console.log(JSON.stringify({ ok: true, network: "local proof server only", proofs }, null, 2));
 } catch (error) {

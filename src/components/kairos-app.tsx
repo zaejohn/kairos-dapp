@@ -268,9 +268,9 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
         </section>
 
         <section id="treasury" className="panel treasury-panel">
-          <div className="panel-heading"><span className="section-index">04 / TREASURY</span><span className="panel-state">{snapshot?.phase === 2n ? allocationApplied ? "Target applied" : "Awaiting allocation" : "Internal allocation"}</span></div>
+          <div className="panel-heading"><span className="section-index">04 / TREASURY</span><span className="panel-state">{snapshot?.phase === 2n ? allocationApplied ? "Target applied" : "Trade changed split" : "Internal allocation"}</span></div>
           <h2>One result, one target</h2>
-          <p>Resolution sets the winning quote side and a 70/30 target. Anyone can apply that target to the internal NIGHT redemption limits. This changes which quote side can be redeemed, without moving assets to an external exchange.</p>
+          <p>Resolution sets the winning quote side and atomically applies its 70/30 target to internal NIGHT redemption limits. Expiry reapplies the existing target. Later trades may change the split; anyone can restore it. No assets move to an external exchange.</p>
           <div className="allocation"><div style={{ width: `${snapshot?.targetA ?? 50}%` }} /><div style={{ width: `${snapshot?.targetB ?? 50}%` }} /></div>
           <div className="allocation-labels"><span>QUOTE A · {snapshot?.targetA ?? 50}%</span><span>QUOTE B · {snapshot?.targetB ?? 50}%</span></div>
           <p>Side reserves: A {snapshot?.reserveA.toString() ?? "—"} · B {snapshot?.reserveB.toString() ?? "—"} atomic NIGHT. Fee pool: {snapshot?.feePool.toString() ?? "—"}.</p>
@@ -278,8 +278,8 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
             const client = await getClient();
             setReceipt(await client.rebalance(contractAddress));
             await refreshAfterFinalized(contractAddress);
-          }, "Rebalance did not finalize. Refresh public state and retry.")}>{busy === "rebalancing" ? "Applying…" : "Apply resolved allocation"}</button></div>
-          <p className="fine-print">Quote redemption is conditional on its side reserve. The allocation call changes accounting limits; the contract retains custody of NIGHT.</p>
+          }, "Rebalance did not finalize. Refresh public state and retry.")}>{busy === "rebalancing" ? "Restoring…" : "Restore target allocation"}</button></div>
+          <p className="fine-print">Quote redemption is conditional on its side reserve. Allocation changes accounting limits; the contract retains custody of NIGHT.</p>
         </section>
 
         <section id="rewards" className="panel rewards-panel">
@@ -353,7 +353,7 @@ export function KairosApp({ initialContractAddress }: { initialContractAddress: 
             setReceipt(await client.expire(contractAddress));
             await refreshAfterFinalized(contractAddress);
           }, "Expiry failed. The one-day resolution window may still be open; load public state and retry.")}>{busy === "expiring" ? "Expiring…" : "Expire missed round"}</button></div>
-          {snapshot?.phase === 2n && !allocationApplied && <p className="fine-print">Apply the resolved allocation in Treasury before starting the next round.</p>}
+          {snapshot?.phase === 2n && !allocationApplied && <p className="fine-print">Restore the target allocation in Treasury after intervening trades before starting the next round.</p>}
         </section>
       </div>
       <footer><span>KAIROS / MIDNIGHT PREPROD</span><span>Private signal · Public policy · Contract-custodied trading</span></footer>

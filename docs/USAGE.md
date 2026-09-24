@@ -14,11 +14,11 @@
 4. In an open round, choose Quote A or Quote B and select **Prepare private opening**. Download the JSON opening. Keep it private and backed up.
 5. Acknowledge that you saved it, then submit the commitment through Lace. Keep the opening even if the app shows an error until you verify whether the transaction finalized.
 6. Before the public close time, send each opening to the trusted resolver through a private channel. Each file contains its side and salt. The resolver orders all eight by public commitment index and pastes their JSON objects as one array into the resolution panel.
-7. After close and within one day, the resolver proves a complete eight-position round. The public state then shows the winner and 70/30 allocation target. A tie preserves the previous target. If openings are missing or the resolver misses that window, anyone may select **Expire missed round** after the one-day window; no new winner or target is set.
-8. After a resolved round, use **Apply resolved allocation** to change the internal NIGHT redemption limits to the public target. A new round cannot start until the current reserve split matches that target. If later trades change the split, apply the allocation again. Read the side reserves before trading: a quote cannot be sold if its side reserve is insufficient.
+7. After close and within one day, the resolver proves a complete eight-position round. The same transaction publishes the winner, sets the 70/30 target, and reapportions internal NIGHT redemption limits. A tie preserves the previous target. If openings are missing or the resolver misses that window, anyone may select **Expire missed round** after the one-day window; it reapplies the existing target without publishing a new winner.
+8. A new round cannot start unless the current reserve split matches the target. If later trades change the split, use **Restore target allocation** before starting the next round. Read the side reserves before trading: a quote cannot be sold if its side reserve is insufficient.
 9. If the three tokens have not yet been issued, use **Initialize fixed token economy** once. For a trade, choose Buy or Sell, a quote side, and a gross whole-number amount in atomic units. Review the public fee and net output before submitting through Lace. A trade may also distribute KAI while fixed inventory remains.
 
-The economic circuits compile and pass local accounting tests, but no issuance or trade has been confirmed on Preprod yet. The treasury call changes internal redemption limits, not external liquidity. There is no yield, market-signal reward, or KAI redemption promise. Trading uses public unshielded assets; direct transfers outside Kairos do not pay its fee.
+The economic circuits compile and pass local accounting tests, but no issuance or trade has been confirmed on Preprod yet. Treasury allocation changes internal redemption limits, not external liquidity. There is no yield, market-signal reward, or KAI redemption promise. Trading uses public unshielded assets; direct transfers outside Kairos do not pay its fee.
 
 ## What Gets Proved (and What Stays Private)
 
@@ -36,7 +36,7 @@ Token issuance, trade side, gross amount, fee, payout address, reserve values, a
 - **Proof or submission error:** retain the opening file, check DUST, Lace prompts, proof server health, and the current round before retrying. Inspect the public contract state before assuming a failed transaction.
 - **Round advanced before submission:** the contract rejects an opening made for an older round. Load the new round and prepare a fresh opening.
 - **Resolution fails:** provide exactly eight valid opening objects in commitment order, all for this contract and round. A missing or altered salt cannot be recovered by Kairos.
-- **Deadline blocks a call:** commitments close at the displayed time; resolution opens then and lasts one day. After that, expire the round and apply any required allocation before starting the next seven-day round.
+- **Deadline blocks a call:** commitments close at the displayed time; resolution opens then and lasts one day. After that, expire the round and restore the target only if later trades changed the split before starting the next seven-day round.
 - **Trade fails:** check that genesis was finalized, that your Lace wallet has the input asset and DUST, that quote inventory covers a buy, or that the selected side reserve covers a sell. Refresh the public state after any transaction before retrying.
 
 ## One-Minute Demo Capture Checklist

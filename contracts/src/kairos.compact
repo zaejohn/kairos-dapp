@@ -182,7 +182,7 @@ circuit tallyOpening(acc: Tally, opening: Opening): Tally {
   };
 }
 
-export circuit resolveRound(openings: Vector<8, Opening>): [] {
+export circuit resolveRound(openings: Vector<8, Opening>, candidateA: Uint<128>): [] {
   assert(phase == 1, "round is not full");
   assert(blockTimeGte(roundCloseAt), "round is still open");
   assert(blockTimeLt((roundCloseAt + (86400 as Uint<64>)) as Uint<64>), "resolution window expired");
@@ -206,29 +206,36 @@ export circuit resolveRound(openings: Vector<8, Opening>): [] {
     sellFeeA = 700;
     sellFeeB = 300;
   }
+  applyTarget(candidateA);
   phase = 2;
 }
 
 // Missing openings cannot keep the market stuck forever. After the one-day
 // resolution window, expire without disclosing a side or changing policy.
-export circuit expireRound(): [] {
+export circuit expireRound(candidateA: Uint<128>): [] {
   assert(phase != 2, "round is already resolved");
   assert(blockTimeGte((roundCloseAt + (86400 as Uint<64>)) as Uint<64>), "resolution window is still open");
+  applyTarget(candidateA);
   winner = 2;
   phase = 2;
 }
 
-// Anyone can execute the resolved policy. The candidate is proved to be the
-// floor of total NIGHT reserve * targetA / 100, so it is not an oracle input.
-export circuit rebalanceTreasury(candidateA: Uint<128>): [] {
+// The caller supplies the division result, but the circuit proves it is the
+// floor of total NIGHT reserve * targetA / 100. It is not an oracle input.
+circuit applyTarget(candidateA: Uint<128>): [] {
   const publicCandidate = disclose(candidateA);
-  assert(phase == 2, "round is not resolved");
   const total = (reserveA + reserveB) as Uint<128>;
   const scaled = total * targetA;
   const lower = publicCandidate * (100 as Uint<7>);
   assert(lower <= scaled && scaled < lower + (100 as Uint<7>), "incorrect target allocation");
   reserveA = publicCandidate;
   reserveB = (total - publicCandidate) as Uint<128>;
+}
+
+// After resolution, trades may disturb the target ratio. Anyone can restore it.
+export circuit rebalanceTreasury(candidateA: Uint<128>): [] {
+  assert(phase == 2, "round is not resolved");
+  applyTarget(candidateA);
 }
 
 export circuit startNextRound(): [] {
