@@ -48,7 +48,7 @@ Node.js 22, npm, Docker, Compact compiler 0.31.1, a Preprod Lace wallet for tran
 2. Run `npm ci`.
 3. Install Compact devtools 0.5.1 and compiler 0.31.1 using the [official setup guide](https://docs.midnight.network/getting-started/installation).
 4. Run `npm run compact:compile` to create `contracts/managed/kairos` and public proving artifacts under `public/zk/kairos`.
-5. Run `npm run proof:up` and `npm run proof:status`. The dedicated Kairos server binds `127.0.0.1:6301`. If Lace is configured for local proving, it separately expects a trusted server at `localhost:6300` according to Midnight's [toolchain guide](https://docs.midnight.network/getting-started/installation); ensure that service is available before wallet transactions.
+5. Run `npm run proof:up` and `npm run proof:status`. The dedicated Kairos server binds `127.0.0.1:6301`. Lace separately uses a trusted local proof server at `http://localhost:6300` according to Midnight's [toolchain guide](https://docs.midnight.network/getting-started/installation); ensure that service is available before wallet transactions.
 6. Run `npm run dev`, then open `http://localhost:3000` in a browser with Lace on Preprod.
 7. Connect Lace, enter a 16+ character local storage password, and use the Settings panel to deploy a contract if no verified address is available. Deployment sets the first close to seven days from the browser's current time. Save the returned public address and transaction ID, then confirm the public close time. On a deployed contract, initialize the fixed token economy once before using the trade routes.
 

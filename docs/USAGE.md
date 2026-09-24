@@ -30,7 +30,7 @@ Token issuance, trade side, gross amount, fee, payout address, reserve values, a
 
 - **No Lace wallet:** open the app in the browser profile where Midnight Lace is installed and enabled. Allow the extension to access `localhost:3000`, then reload the page.
 - **Wrong network:** switch Lace to Midnight Preprod, then reconnect. Lace may report this during connection as `Network ID mismatch`.
-- **Proof server unavailable:** run `npm run proof:up` and `npm run proof:status`; the browser must reach `http://127.0.0.1:6301/health`. Lace's own local-proving setting may also require a trusted service at `localhost:6300`.
+- **Proof server unavailable:** run `npm run proof:up` and `npm run proof:status`; the browser must reach `http://127.0.0.1:6301/health`. Lace's local-proving setting separately uses a trusted service at `http://localhost:6300`.
 - **No public state:** confirm the 64-character address belongs to a deployed Preprod contract, then retry after indexer propagation.
 - **Verifier rejects the address:** confirm that the transaction ID belongs to that deployment and that the browser was refreshed after the latest contract compile. An older Kairos deployment needs its matching older artifacts and cannot verify as the current build.
 - **Proof or submission error:** retain the opening file, check DUST, Lace prompts, proof server health, and the current round before retrying. Inspect the public contract state before assuming a failed transaction.

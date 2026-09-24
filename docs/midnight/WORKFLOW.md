@@ -2,7 +2,7 @@
 
 ## 1. Choose the network explicitly
 
-Use `NEXT_PUBLIC_MIDNIGHT_NETWORK` for the Lace connection target. The starter allows `undeployed`, `preview`, `preprod`, and `mainnet`. The example env uses `preprod`.
+Use `NEXT_PUBLIC_MIDNIGHT_NETWORK` for the Lace connection target. Kairos accepts only `preprod`; the example env uses `preprod`.
 
 Never silently reinterpret one network as another.
 
@@ -27,7 +27,7 @@ npm run proof:up
 npm run proof:status
 ```
 
-The compose file binds to `127.0.0.1:6300` rather than all interfaces.
+The Kairos compose file binds proof server 8.1.0 to `127.0.0.1:6301` rather than all interfaces. Lace's local-proving setting uses a separate trusted service at `http://localhost:6300`; the Kairos compose file does not provide that port. Check that both services are healthy before wallet transactions.
 
 The proof server receives private witness inputs. Use local proving or an operator-controlled encrypted remote service only. Do not send private proving input to an arbitrary public endpoint.
 
