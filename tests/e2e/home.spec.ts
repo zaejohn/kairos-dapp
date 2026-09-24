@@ -13,7 +13,7 @@ test("shows only the workshop and footer on desktop, with usable image stations"
   await expect(page.getByRole("region", { name: "Market status" }).locator("strong").first()).toHaveCSS("color", "rgb(255, 241, 214)");
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Wallet" }).click();
-  await expect(page.getByText("No compatible wallets detected.")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "No compatible Midnight wallets detected." })).toBeVisible();
   await expect(page.getByRole("button", { name: "LACE", exact: true })).toHaveCount(0);
 });
 
@@ -72,7 +72,7 @@ test("explains Lace's Preprod network mismatch", async ({ page }) => {
   await expect(page.getByRole("alert").filter({ hasText: "Switch to preprod and retry" })).toBeVisible();
 });
 
-test("loads verifier keys and reaches wallet balancing without repeating status requests", async ({ page }) => {
+test("loads verifier keys and reaches wallet balancing after confirming connection status", async ({ page }) => {
   const verifierResponses: number[] = [];
   page.on("response", (response) => {
     if (response.url().includes("/zk/kairos/keys/") && response.url().endsWith(".verifier")) {
@@ -90,8 +90,7 @@ test("loads verifier keys and reaches wallet balancing without repeating status 
           connect: async () => ({
             getConnectionStatus: async () => {
               checks += 1;
-              if (checks === 1) return { status: "connected", networkId: "preprod" };
-              throw new Error("Wallet service unavailable");
+              return { status: "connected", networkId: "preprod" };
             },
             getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address", shieldedCoinPublicKey: "11".repeat(32), shieldedEncryptionPublicKey: "22".repeat(32) }),
           }),
@@ -107,7 +106,7 @@ test("loads verifier keys and reaches wallet balancing without repeating status 
   await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
   await page.getByText("Local developer controls").click();
   await page.getByRole("button", { name: "Deploy new Preprod contract" }).click();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { walletStatusChecks: () => number }).walletStatusChecks())).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { walletStatusChecks: () => number }).walletStatusChecks())).toBe(2);
   await expect(page.getByRole("alert").filter({ hasText: "The wallet could not balance or authorize the transaction" })).toBeVisible();
   expect(verifierResponses).toHaveLength(8);
   expect(verifierResponses.every((status) => status === 200)).toBe(true);
@@ -182,7 +181,7 @@ test("lists both injected wallets and connects only the selected provider", asyn
   await expect(page.getByRole("dialog", { name: "Wallet" })).not.toBeVisible();
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await expect(page.getByText("CONNECTED NETWORK · MIDNIGHT PREPROD")).toBeVisible();
-  await expect(page.getByLabel("Your shielded address")).toHaveValue("test-shielded-address");
+  await expect(page.getByRole("button", { name: "Copy full shielded address" })).toContainText("test-shielded-address");
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
   await page.getByRole("button", { name: "Refresh wallet balances" }).click();

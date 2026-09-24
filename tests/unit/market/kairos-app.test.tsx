@@ -6,6 +6,7 @@ import type { MarketSnapshot } from "@/lib/midnight/market-client";
 const readPublicMarket = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/midnight/market-client", () => ({ readPublicMarket }));
 vi.mock("next/image", () => ({ default: () => null }));
+vi.mock("@/components/night-market-chart", () => ({ NightMarketChart: () => null }));
 
 HTMLDialogElement.prototype.showModal ??= function () { this.setAttribute("open", ""); };
 HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
