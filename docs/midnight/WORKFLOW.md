@@ -43,7 +43,7 @@ A signing prompt does not prove steps 3–5 succeeded.
 
 ## 4. Lace wallet
 
-Wallet code belongs in client components/adapters because it depends on browser injection. Detect `window.midnight.mnLace`; do not assume installation.
+Wallet code belongs in client components/adapters because it depends on browser injection. Find Lace by its `io.lace.wallet` provider identifier under `window.midnight`; its injection key may be an opaque ID. Keep `mnLace` as a legacy fallback and do not assume installation.
 
 The adapter should:
 
