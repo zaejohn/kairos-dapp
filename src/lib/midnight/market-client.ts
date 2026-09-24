@@ -12,17 +12,30 @@ import { Transaction, type FinalizedTransaction } from "@midnight-ntwrk/midnight
 import { encodeUserAddress } from "@midnight-ntwrk/compact-runtime";
 import { MidnightBech32m, UnshieldedAddress } from "@midnight-ntwrk/wallet-sdk-address-format";
 import type { MidnightProvider, MidnightProviders, UnboundTransaction, WalletProvider } from "@midnight-ntwrk/midnight-js-types";
-import { fromHex, parseCoinPublicKeyToHex, parseEncPublicKeyToHex, PasswordValidationError, toHex, validatePassword } from "@midnight-ntwrk/midnight-js-utils";
+import { fromHex, PasswordValidationError, toHex, validatePassword } from "@midnight-ntwrk/midnight-js-utils";
 import { Contract, ledger, type Opening } from "../../../contracts/managed/kairos/contract/index.js";
 import { AppError } from "@/lib/errors/app-error";
 import { tradeFee, type QuoteSide, type TradeDirection } from "@/lib/market/trading";
 import { targetAfterResolution, targetReserveA } from "@/lib/market/allocation";
 import { withTransactionProgress, type TransactionProgress } from "@/lib/midnight/transaction-progress";
+import { walletFailureReason, type WalletConnection } from "@/lib/midnight/wallet";
 
 const INDEXER_HTTP = "https://indexer.preprod.midnight.network/api/v4/graphql";
 const INDEXER_WS = "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
 const PROOF_SERVER = "http://127.0.0.1:6301";
 type CircuitId = "commitPosition" | "resolveRound" | "expireRound" | "startNextRound" | "initializeEconomy" | "buyQuote" | "sellQuote" | "rebalanceTreasury";
+
+export interface PublicTreasuryAction {
+  index: bigint;
+  round: bigint;
+  kind: bigint;
+  winner: bigint;
+  targetA: bigint;
+  targetB: bigint;
+  reserveA: bigint;
+  reserveB: bigint;
+  feePool: bigint;
+}
 
 export interface MarketSnapshot {
   round: bigint;
@@ -44,6 +57,8 @@ export interface MarketSnapshot {
   buyFeeB: bigint;
   sellFeeA: bigint;
   sellFeeB: bigint;
+  treasuryActionCount: bigint;
+  recentTreasuryActions: PublicTreasuryAction[];
 }
 
 export interface PublicTxReceipt {
@@ -57,6 +72,11 @@ export async function readPublicMarket(contractAddress: string): Promise<MarketS
   const state = await publicDataProvider.queryContractState(contractAddress);
   if (!state) throw new AppError("CONTRACT_NOT_FOUND", "Kairos contract was not found on Preprod.");
   const view = ledger(state.data);
+  const recentTreasuryActions = Array.from({ length: Number(view.treasuryActionCount > 10n ? 10n : view.treasuryActionCount) }, (_, offset) => {
+    const index = view.treasuryActionCount - 1n - BigInt(offset);
+    const action = view.treasuryActions.lookup(index);
+    return { index, ...action };
+  });
   return {
     round: view.round,
     roundCloseAt: view.roundCloseAt,
@@ -77,31 +97,15 @@ export async function readPublicMarket(contractAddress: string): Promise<MarketS
     buyFeeB: view.buyFeeB,
     sellFeeA: view.sellFeeA,
     sellFeeB: view.sellFeeB,
+    treasuryActionCount: view.treasuryActionCount,
+    recentTreasuryActions,
   };
 }
 
-function walletProvider(api: ConnectedAPI): WalletProvider & MidnightProvider & { loadKeys(): Promise<{ coin: string; encryption: string }> } {
-  let keys: { coin: string; encryption: string } | undefined;
-  async function loadKeys() {
-    if (!keys) {
-      const addresses = await api.getShieldedAddresses();
-      keys = {
-        coin: parseCoinPublicKeyToHex(addresses.shieldedCoinPublicKey, "preprod"),
-        encryption: parseEncPublicKeyToHex(addresses.shieldedEncryptionPublicKey, "preprod"),
-      };
-    }
-    return keys;
-  }
-  // Midnight.js requires synchronous key access. Initialize before returning.
+function walletProvider(api: ConnectedAPI, keys: { coin: string; encryption: string }): WalletProvider & MidnightProvider {
   return {
-    getCoinPublicKey: () => {
-      if (!keys) throw new AppError("WALLET_KEYS_UNAVAILABLE", "Reconnect Lace to load wallet keys.");
-      return keys.coin;
-    },
-    getEncryptionPublicKey: () => {
-      if (!keys) throw new AppError("WALLET_KEYS_UNAVAILABLE", "Reconnect Lace to load wallet keys.");
-      return keys.encryption;
-    },
+    getCoinPublicKey: () => keys.coin,
+    getEncryptionPublicKey: () => keys.encryption,
     async balanceTx(tx: UnboundTransaction): Promise<FinalizedTransaction> {
       const balanced = await api.balanceUnsealedTransaction(toHex(tx.serialize()));
       return Transaction.deserialize("signature", "proof", "binding", fromHex(balanced.tx));
@@ -109,14 +113,13 @@ function walletProvider(api: ConnectedAPI): WalletProvider & MidnightProvider & 
     async submitTx(tx: FinalizedTransaction): Promise<string> {
       await api.submitTransaction(toHex(tx.serialize()));
       const txId = tx.identifiers()[0];
-      if (!txId) throw new AppError("TX_ID_MISSING", "Lace submitted the transaction without an identifier.");
+      if (!txId) throw new AppError("TX_ID_MISSING", "The wallet submitted the transaction without an identifier.");
       return txId;
     },
-    loadKeys,
   };
 }
 
-export async function createMarketClient(api: ConnectedAPI, accountId: string, password: string, onProgress: (progress: TransactionProgress) => void = () => {}) {
+export async function createMarketClient(wallet: WalletConnection, password: string, onProgress: (progress: TransactionProgress) => void = () => {}) {
   if (typeof window === "undefined") throw new AppError("BROWSER_ONLY", "The market is available only in a browser.");
   try {
     validatePassword(password);
@@ -126,13 +129,21 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
     }
     throw cause;
   }
-  const status = await api.getConnectionStatus();
+  if (wallet.networkId !== "preprod") {
+    throw new AppError("WALLET_WRONG_NETWORK", "Connect a Midnight wallet to Preprod before using the market.");
+  }
+  let status: Awaited<ReturnType<ConnectedAPI["getConnectionStatus"]>>;
+  try {
+    status = await wallet.api.getConnectionStatus();
+  } catch (cause) {
+    const reason = walletFailureReason(cause);
+    throw new AppError("WALLET_STATUS_UNAVAILABLE", `The wallet connection could not be confirmed${reason ? ` (${reason})` : ""}. Reconnect the wallet and retry.`, { cause });
+  }
   if (status.status !== "connected" || status.networkId !== "preprod") {
-    throw new AppError("WALLET_WRONG_NETWORK", "Connect Lace to Midnight Preprod before using the market.");
+    throw new AppError("WALLET_WRONG_NETWORK", "The wallet is no longer connected to Preprod. Reconnect it before using the market.");
   }
   setNetworkId("preprod");
-  const adapter = walletProvider(api);
-  await adapter.loadKeys();
+  const adapter = walletProvider(wallet.api, { coin: wallet.coinPublicKey, encryption: wallet.encryptionPublicKey });
   const zkConfigProvider = new FetchZkConfigProvider<CircuitId>(`${window.location.origin}/zk/kairos`);
   const publicDataProvider = indexerPublicDataProvider(INDEXER_HTTP, INDEXER_WS);
   const transactionProviders = withTransactionProgress({
@@ -142,7 +153,7 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
   }, onProgress);
   const providers: MidnightProviders<CircuitId, "kairos", undefined> = {
     privateStateProvider: levelPrivateStateProvider<"kairos", undefined>({
-      accountId,
+      accountId: wallet.shieldedAddress,
       midnightDbName: "kairos-preprod-v1",
       privateStateStoreName: "private-state",
       signingKeyStoreName: "signing-keys",
@@ -162,12 +173,12 @@ export async function createMarketClient(api: ConnectedAPI, accountId: string, p
   }
 
   async function payoutAddress() {
-    const { unshieldedAddress } = await api.getUnshieldedAddress();
+    const { unshieldedAddress } = await wallet.api.getUnshieldedAddress();
     try {
       const decoded = MidnightBech32m.parse(unshieldedAddress).decode(UnshieldedAddress, "preprod");
       return { bytes: encodeUserAddress(decoded.hexString) };
     } catch (cause) {
-      throw new AppError("UNSHIELDED_ADDRESS_INVALID", "Lace returned an invalid Preprod unshielded address.", { cause });
+      throw new AppError("UNSHIELDED_ADDRESS_INVALID", "The wallet returned an invalid Preprod unshielded address.", { cause });
     }
   }
 

@@ -1,21 +1,50 @@
 import { expect, test } from "@playwright/test";
 
-test("opens the market and wallet stations", async ({ page }) => {
+test("shows the workshop, product context, and usable station navigation", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Market conviction");
-  await page.getByRole("link", { name: "Open Market" }).click();
-  await expect(page).toHaveURL(/#market$/);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("img", { name: /Kairos workshop/ })).toBeVisible();
+  await expect(page.locator("main > footer")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Conviction in private/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Kairos stations" })).toBeVisible();
+  await page.getByRole("button", { name: "Open Trading Engine" }).click();
   await expect(page.getByRole("heading", { name: "Commit your market view" })).toBeVisible();
-  await page.getByRole("button", { name: "Connect Lace" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Midnight Lace is not available to this tab" })).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Open Wallet" }).click();
+  await expect(page.getByText("No compatible wallets detected.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "LACE", exact: true })).toHaveCount(0);
 });
 
-test("mobile navigation exposes the same market feature", async ({ page }) => {
+test("mobile station navigation opens the matching dialogs", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("navigation", { name: "Product stations" })).toBeVisible();
-  await page.getByRole("navigation", { name: "Product stations" }).getByRole("link", { name: /Market/ }).click();
-  await expect(page.getByRole("heading", { name: "Commit your market view" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("navigation", { name: "Kairos stations" }).getByRole("button", { name: /Treasury/ }).click();
+  await expect(page.getByRole("dialog", { name: "Treasury" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "One result, one target" })).toBeVisible();
+  await expect(page.getByText("ACCOUNTED NIGHT")).toBeVisible();
+});
+
+test("previews an opening in the browser without treating it as a finalized position", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Open Trading Engine" }).click();
+  await page.getByText("My position files and session receipts").click();
+  await page.getByLabel("Preview a saved opening locally").setInputFiles({
+    name: "kairos-opening-round-3.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({
+      version: 1,
+      contractAddress: "a".repeat(64),
+      round: 3,
+      side: 1,
+      salt: "b".repeat(64),
+    })),
+  });
+  await expect(page.getByText("Imported file · Unverified on-chain")).toBeVisible();
+  await expect(page.getByText("Round 3 · Quote B")).toBeVisible();
+  await expect(page.getByText("No finalized position has been recorded in this browser session.")).toBeVisible();
+  await expect(page.getByText("b".repeat(64))).toHaveCount(0);
 });
 
 test("explains Lace's Preprod network mismatch", async ({ page }) => {
@@ -32,40 +61,23 @@ test("explains Lace's Preprod network mismatch", async ({ page }) => {
     });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Connect Lace" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Switch Lace to preprod and retry" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Open Wallet" }).click();
+  await page.getByRole("button", { name: "LACE", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Wallet" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Switch to preprod and retry" })).toBeVisible();
 });
 
-test("shows provider preparation while deployment waits on the connected wallet", async ({ page }) => {
-  await page.addInitScript(() => {
-    let checks = 0;
-    Object.defineProperty(window, "midnight", {
-      value: {
-        lace: {
-          rdns: "io.lace.wallet",
-          apiVersion: "4.0.1",
-          connect: async () => ({
-            getConnectionStatus: async () => {
-              checks += 1;
-              if (checks === 1) return { status: "connected", networkId: "preprod" };
-              return new Promise(() => {});
-            },
-            getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address" }),
-          }),
-        },
-      },
-    });
+test("loads verifier keys and reaches wallet balancing without repeating status requests", async ({ page }) => {
+  const verifierResponses: number[] = [];
+  page.on("response", (response) => {
+    if (response.url().includes("/zk/kairos/keys/") && response.url().endsWith(".verifier")) {
+      verifierResponses.push(response.status());
+    }
   });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Connect Lace" }).click();
-  await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
-  await page.getByRole("button", { name: "Deploy new Preprod contract" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Preparing wallet keys and contract providers" })).toBeVisible();
-});
-
-test("reports a preparation failure without claiming a transaction was submitted", async ({ page }) => {
   await page.addInitScript(() => {
     let checks = 0;
+    Object.assign(window, { walletStatusChecks: () => checks });
     Object.defineProperty(window, "midnight", {
       value: {
         lace: {
@@ -77,26 +89,46 @@ test("reports a preparation failure without claiming a transaction was submitted
               if (checks === 1) return { status: "connected", networkId: "preprod" };
               throw new Error("Wallet service unavailable");
             },
-            getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address" }),
+            getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address", shieldedCoinPublicKey: "11".repeat(32), shieldedEncryptionPublicKey: "22".repeat(32) }),
           }),
         },
       },
     });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Connect Lace" }).click();
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Open Wallet" }).click();
+  await page.getByRole("button", { name: "LACE", exact: true }).click();
+  await page.getByRole("button", { name: "Open Settings" }).click();
   await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
   await page.getByRole("button", { name: "Deploy new Preprod contract" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Wallet or provider setup failed" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { walletStatusChecks: () => number }).walletStatusChecks())).toBe(1);
+  await expect(page.getByRole("alert").filter({ hasText: "The wallet could not balance or authorize the transaction" })).toBeVisible();
+  expect(verifierResponses).toHaveLength(8);
+  expect(verifierResponses.every((status) => status === 200)).toBe(true);
   await expect(page.getByText("Submitted transaction ID:")).toHaveCount(0);
 });
 
-test("clearing a Lace session removes private inputs from the page", async ({ page }) => {
+test("queries the Preprod indexer with browser fetch", async ({ page }) => {
+  let indexerRequests = 0;
+  await page.route("https://indexer.preprod.midnight.network/api/v4/graphql", async (route) => {
+    indexerRequests++;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { contractAction: null } }) });
+  });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Open Settings" }).click();
+  await page.getByLabel("Preprod contract address").fill("a".repeat(64));
+  await page.getByRole("button", { name: "Load public state" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Kairos contract was not found on Preprod" })).toBeVisible();
+  expect(indexerRequests).toBeGreaterThan(0);
+});
+
+test("explains missing shielded keys at connection before deployment", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "midnight", {
       value: {
-        "opaque-lace-provider-id": {
-          name: "lace",
+        lace: {
           rdns: "io.lace.wallet",
           apiVersion: "4.0.1",
           connect: async () => ({
@@ -108,22 +140,54 @@ test("clearing a Lace session removes private inputs from the page", async ({ pa
     });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Connect Lace" }).click();
-  await expect(page.getByRole("button", { name: "Clear local session" })).toBeVisible();
-  const marketChoice = page.getByRole("group", { name: "Quote-side choice" });
-  await marketChoice.getByRole("button", { name: "Quote B" }).click();
-  await page.getByRole("button", { name: "Sell quote", exact: true }).click();
-  await page.getByRole("group", { name: "Trade quote side" }).getByRole("button", { name: "Quote B" }).click();
-  await page.getByLabel("Gross amount in atomic units").fill("10000");
-  await page.getByLabel("Local storage password").fill("PrivatePassphrase123!");
-  await page.getByLabel("Private opening bundle").fill("private test data");
-  await page.getByRole("button", { name: "Clear local session" }).click();
-  await expect(page.getByLabel("Local storage password")).toHaveValue("");
-  await expect(page.getByLabel("Private opening bundle")).toHaveValue("");
-  await expect(page.getByLabel("Gross amount in atomic units")).toHaveValue("");
-  await expect(marketChoice.getByRole("button", { name: "Quote A" })).toHaveClass(/selected/);
-  await expect(marketChoice.getByRole("button", { name: "Quote B" })).not.toHaveClass(/selected/);
-  await expect(page.getByRole("button", { name: "Buy quote", exact: true })).toHaveClass(/selected/);
-  await expect(page.getByRole("group", { name: "Trade quote side" }).getByRole("button", { name: "Quote A" })).toHaveClass(/selected/);
-  await expect(page.getByRole("button", { name: "Connect Lace" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Open Wallet" }).click();
+  await page.getByRole("button", { name: "LACE", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "did not provide valid preprod shielded public keys" })).toBeVisible();
+  await expect(page.getByText("Submitted transaction ID:")).toHaveCount(0);
+});
+
+test("lists both injected wallets and connects only the selected provider", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "midnight", {
+      value: {
+        oneAm: {
+          name: "1AM", rdns: "xyz.1am", apiVersion: "4.0.1",
+          connect: async () => ({
+            getConnectionStatus: async () => ({ status: "connected", networkId: "preprod" }),
+            getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address", shieldedCoinPublicKey: "11".repeat(32), shieldedEncryptionPublicKey: "22".repeat(32) }),
+            getUnshieldedBalances: async () => ({ ["f".repeat(64)]: 4200n }),
+          }),
+        },
+        lace: {
+          name: "Lace", rdns: "io.lace.wallet", apiVersion: "4.0.1",
+          connect: async () => { throw new Error("Lace should not be selected"); },
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Open Wallet" }).click();
+  await expect(page.getByRole("button", { name: "1AM", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "LACE", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "1AM", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Open Wallet" })).toBeEnabled();
+  await expect(page.getByRole("dialog", { name: "Wallet" })).not.toBeVisible();
+  await page.getByRole("button", { name: "Open Wallet" }).click();
+  await expect(page.getByLabel("Your shielded address")).toHaveValue("test-shielded-address");
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Open Settings" }).click();
+  await page.getByRole("button", { name: "Refresh wallet balances" }).click();
+  await expect(page.getByText("4200")).toBeVisible();
+  await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Open Wallet" }).click();
+  await page.getByRole("button", { name: "Disconnect in Kairos" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Kairos session disconnected" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect wallet" })).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Open Settings" }).click();
+  await expect(page.getByLabel("Local storage password")).toBeEmpty();
+  await expect(page.getByRole("button", { name: "Refresh wallet balances" })).toBeDisabled();
 });

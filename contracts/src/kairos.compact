@@ -17,6 +17,19 @@ export struct Tally {
   forB: Uint<8>;
 }
 
+// All fields are already public at the time of a treasury action. This
+// append-only record keeps prior round outcomes visible after the next round.
+export struct TreasuryAction {
+  round: Uint<32>;
+  kind: Uint<8>; // 0 resolution, 1 expiry, 2 reserve restoration
+  winner: Uint<8>;
+  targetA: Uint<8>;
+  targetB: Uint<8>;
+  reserveA: Uint<128>;
+  reserveB: Uint<128>;
+  feePool: Uint<128>;
+}
+
 export ledger round: Uint<32>;
 export ledger roundCloseAt: Uint<64>; // public Unix seconds, chosen at deployment
 export ledger commitments: Map<Uint<8>, Bytes<32>>;
@@ -37,6 +50,8 @@ export ledger buyFeeA: Uint<16>; // basis points for contract-mediated trades
 export ledger buyFeeB: Uint<16>;
 export ledger sellFeeA: Uint<16>;
 export ledger sellFeeB: Uint<16>;
+export ledger treasuryActions: Map<Uint<32>, TreasuryAction>;
+export ledger treasuryActionCount: Uint<32>;
 
 constructor(firstRoundCloseAt: Uint<64>) {
   // Leave room for all Uint<32> weekly rounds and their one-day grace periods.
@@ -57,6 +72,7 @@ constructor(firstRoundCloseAt: Uint<64>) {
   buyFeeB = 300;
   sellFeeA = 500;
   sellFeeB = 500;
+  treasuryActionCount = 0;
 }
 
 // Fixed-supply, contract-custodied genesis. Anyone may trigger the first mint,
@@ -208,6 +224,7 @@ export circuit resolveRound(openings: Vector<8, Opening>, candidateA: Uint<128>)
   }
   applyTarget(candidateA);
   phase = 2;
+  recordTreasuryAction(0);
 }
 
 // Missing openings cannot keep the market stuck forever. After the one-day
@@ -218,6 +235,22 @@ export circuit expireRound(candidateA: Uint<128>): [] {
   applyTarget(candidateA);
   winner = 2;
   phase = 2;
+  recordTreasuryAction(1);
+}
+
+circuit recordTreasuryAction(kind: Uint<8>): [] {
+  assert(treasuryActionCount < (4294967295 as Uint<32>), "treasury history is full");
+  treasuryActions.insert(treasuryActionCount, TreasuryAction {
+    round: round,
+    kind: kind,
+    winner: winner,
+    targetA: targetA,
+    targetB: targetB,
+    reserveA: reserveA,
+    reserveB: reserveB,
+    feePool: feePool
+  });
+  treasuryActionCount = (treasuryActionCount + 1) as Uint<32>;
 }
 
 // The caller supplies the division result, but the circuit proves it is the
@@ -235,7 +268,11 @@ circuit applyTarget(candidateA: Uint<128>): [] {
 // After resolution, trades may disturb the target ratio. Anyone can restore it.
 export circuit rebalanceTreasury(candidateA: Uint<128>): [] {
   assert(phase == 2, "round is not resolved");
+  const beforeA = reserveA;
+  const beforeB = reserveB;
   applyTarget(candidateA);
+  assert(reserveA != beforeA || reserveB != beforeB, "target is already applied");
+  recordTreasuryAction(2);
 }
 
 export circuit startNextRound(): [] {

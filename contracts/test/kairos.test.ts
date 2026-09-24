@@ -240,4 +240,33 @@ describe("Kairos bounded private market", () => {
     market.next();
     expect(market.state().round).toBe(2n);
   });
+
+  it("records resolved, restored, and expired treasury actions across rounds", () => {
+    const market = setup();
+    market.issueEconomy();
+    market.buy(0n, 10_000n, 300n);
+    market.buy(1n, 10_000n, 300n);
+    const positions = Array.from({ length: 8 }, (_, index) => opening(index < 5 ? 0n : 1n, index + 1));
+    positions.forEach(market.commit);
+    market.resolve(positions);
+    const resolved = market.state().treasuryActions.lookup(0n);
+    expect(market.state().treasuryActionCount).toBe(1n);
+    expect([resolved.round, resolved.kind, resolved.winner, resolved.targetA, resolved.targetB]).toEqual([1n, 0n, 0n, 70n, 30n]);
+    expect([resolved.reserveA, resolved.reserveB, resolved.feePool]).toEqual([13_580n, 5_820n, 600n]);
+
+    market.buy(0n, 10_000n, 100n);
+    market.rebalance(20_510n);
+    const restored = market.state().treasuryActions.lookup(1n);
+    expect([restored.round, restored.kind, restored.reserveA, restored.reserveB]).toEqual([1n, 2n, 20_510n, 8_790n]);
+    expect(() => market.rebalance(20_510n)).toThrow(/target is already applied/);
+    expect(market.state().treasuryActionCount).toBe(2n);
+
+    market.next();
+    expect(market.state().treasuryActions.lookup(0n)).toEqual(resolved);
+    market.at(FIRST_CLOSE + 604_800 + 86_400);
+    market.expire();
+    const expired = market.state().treasuryActions.lookup(2n);
+    expect([expired.round, expired.kind, expired.winner, expired.targetA]).toEqual([2n, 1n, 2n, 70n]);
+    expect(market.state().treasuryActionCount).toBe(3n);
+  });
 });

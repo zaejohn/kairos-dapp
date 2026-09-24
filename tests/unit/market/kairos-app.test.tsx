@@ -7,9 +7,13 @@ const readPublicMarket = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/midnight/market-client", () => ({ readPublicMarket }));
 vi.mock("next/image", () => ({ default: () => null }));
 
+HTMLDialogElement.prototype.showModal ??= function () { this.setAttribute("open", ""); };
+HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
+
 afterEach(() => {
   cleanup();
   readPublicMarket.mockReset();
+  vi.unstubAllGlobals();
 });
 
 const publicState = (round: bigint): MarketSnapshot => ({
@@ -17,6 +21,23 @@ const publicState = (round: bigint): MarketSnapshot => ({
   economyIssued: false, quoteAColor: "", quoteBColor: "", kaiColor: "",
   reserveA: 0n, reserveB: 0n, feePool: 0n, kaiDistributed: 0n,
   buyFeeA: 300n, buyFeeB: 300n, sellFeeA: 500n, sellFeeB: 500n,
+  treasuryActionCount: 0n, recentTreasuryActions: [],
+});
+
+it("explains an unavailable configured Preprod contract", async () => {
+  readPublicMarket.mockRejectedValue(new Error("Indexer unavailable"));
+  render(<KairosApp initialContractAddress={"a".repeat(64)} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not load the configured Preprod contract");
+});
+
+it("rejects a reachable proof server with the wrong version", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(url.endsWith("/version") ? "8.0.0" : "OK")));
+  render(<KairosApp initialContractAddress="" />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check local proof server" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Cannot confirm proof server 8.1.0");
+  expect(screen.getByText(/Proof server on this device: unavailable/)).toBeInTheDocument();
 });
 
 it("ignores an old contract response after the address changes", async () => {
@@ -29,11 +50,14 @@ it("ignores an old contract response after the address changes", async () => {
     if (address === addressB) resolveB = resolve;
   }));
   render(<KairosApp initialContractAddress={addressA} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
   await waitFor(() => expect(readPublicMarket).toHaveBeenCalledWith(addressA));
   fireEvent.change(screen.getByLabelText("Preprod contract address"), { target: { value: addressB } });
   fireEvent.click(screen.getByRole("button", { name: "Load public state" }));
   await waitFor(() => expect(readPublicMarket).toHaveBeenCalledWith(addressB));
   await act(async () => resolveB(publicState(2n)));
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  fireEvent.click(screen.getByRole("button", { name: "Open Trading Engine" }));
   const marketStatus = screen.getByRole("region", { name: "Market status" });
   await waitFor(() => expect(within(marketStatus).getByText("02")).toBeInTheDocument());
   await act(async () => resolveA(publicState(1n)));
@@ -45,6 +69,7 @@ it("quotes the public asymmetric fee and keeps trading gated on a wallet", async
   const address = "a".repeat(64);
   readPublicMarket.mockResolvedValue({ ...publicState(1n), economyIssued: true, buyFeeA: 100n, sellFeeA: 700n });
   render(<KairosApp initialContractAddress={address} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Trading Engine" }));
   await waitFor(() => expect(screen.getByText("Issued")).toBeInTheDocument());
   fireEvent.change(screen.getByLabelText("Gross amount in atomic units"), { target: { value: "10000" } });
   expect(screen.getByText(/100 units \(100 bps\)/)).toBeInTheDocument();
@@ -57,6 +82,7 @@ it("shows the treasury step when a resolved round has unapplied reserves", async
   const address = "a".repeat(64);
   readPublicMarket.mockResolvedValue({ ...publicState(1n), phase: 2n, targetA: 70n, targetB: 30n, reserveA: 9_700n, reserveB: 9_700n });
   render(<KairosApp initialContractAddress={address} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Trading Engine" }));
   expect(await screen.findByText("Restore the target allocation in Treasury after intervening trades before starting the next round.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Start next round" })).toBeDisabled();
 });
@@ -65,7 +91,17 @@ it("shows a missed deadline and prevents new position preparation", async () => 
   const address = "a".repeat(64);
   readPublicMarket.mockResolvedValue({ ...publicState(1n), roundCloseAt: 1_700_000_000n });
   render(<KairosApp initialContractAddress={address} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Trading Engine" }));
   expect(await within(screen.getByRole("region", { name: "Market status" })).findByText("Expiry available")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Prepare private opening" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Expire missed round" })).toBeDisabled();
+});
+
+it("shows only recorded public treasury actions", async () => {
+  const address = "a".repeat(64);
+  readPublicMarket.mockResolvedValue({ ...publicState(2n), phase: 2n, treasuryActionCount: 1n, recentTreasuryActions: [{ index: 0n, round: 1n, kind: 0n, winner: 0n, targetA: 70n, targetB: 30n, reserveA: 700n, reserveB: 300n, feePool: 20n }] });
+  render(<KairosApp initialContractAddress={address} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Treasury" }));
+  expect(await screen.findByText("Resolution · Quote A")).toBeInTheDocument();
+  expect(screen.getByText("700 / 300 atomic NIGHT")).toBeInTheDocument();
 });

@@ -3,20 +3,22 @@
 ## What You Need
 
 - A browser with Lace connected to Midnight Preprod and enough DUST for transactions.
-- The local Kairos app and its dedicated proof server at `127.0.0.1:6301`.
+- The local Kairos app or a verified public deployment, plus a dedicated proof server at `127.0.0.1:6301` on your own device. Lace separately needs its proof server on port 6300.
 - A trusted resolver who will collect all eight opening files for a full round.
 
 ## Step-by-Step Guide
 
-1. Start the app as described in the README and check the proof server in Settings.
-2. Connect Lace and confirm it is on Preprod. Set a strong local storage password in Settings. Keep this password safe; it protects Midnight signing-key storage in this browser.
-3. Load a verified Preprod contract address in Settings. If you are the operator and no address exists, use **Deploy new Preprod contract** and record the finalized address and transaction ID. Run `npm run verify:preprod -- <address> <transaction-id>` to check the indexer result and current eight-circuit artifact. The first round closes seven days after deployment was requested; confirm the public close time in the status strip. A deployment is real only after the app shows a finalized receipt and public state can be read.
-4. In an open round, choose Quote A or Quote B and select **Prepare private opening**. Download the JSON opening. Keep it private and backed up.
+1. Start the app as described in the README. Use the workshop image or station navigation to open **Settings** and check the proof server.
+2. Open **Wallet** and choose a detected compatible Midnight wallet on Preprod. Lace has been observed in the owner's browser; the 1AM selection path has local browser-mock evidence only. Set a strong local storage password in **Settings**. Keep it safe; it protects Midnight signing-key storage in this browser. **Disconnect in Kairos** clears local private inputs and the password, but wallet site permission must be managed in the wallet. Settings can request wallet-reported unshielded balances; token labels depend on a loaded contract's public colors.
+3. Load the verified Preprod contract `ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f` in **Settings**; copying `.env.example` to `.env.local` loads it automatically. Its finalized deployment transaction hash is `ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc`. If you intentionally deploy a replacement, record its address and hash and run `npm run verify:preprod -- <address> <transaction-hash-or-identifier>` before using it. Confirm the public close time in the **Trading Engine** status strip.
+4. Open **Trading Engine**. In an open round, choose Quote A or Quote B and select **Prepare private opening**. Download the JSON opening. Keep it private and backed up.
 5. Acknowledge that you saved it, then submit the commitment through Lace. Keep the opening even if the app shows an error until you verify whether the transaction finalized.
+   Open **My position files and session receipts** to preview a saved opening locally. It shows the selected side on your device without uploading the file. A file alone does not prove that a transaction reached Preprod; a finalized submission appears separately for this browser session.
 6. Before the public close time, send each opening to the trusted resolver through a private channel. Each file contains its side and salt. The resolver orders all eight by public commitment index and pastes their JSON objects as one array into the resolution panel.
 7. After close and within one day, the resolver proves a complete eight-position round. The same transaction publishes the winner, sets the 70/30 target, and reapportions internal NIGHT redemption limits. A tie preserves the previous target. If openings are missing or the resolver misses that window, anyone may select **Expire missed round** after the one-day window; it reapplies the existing target without publishing a new winner.
-8. A new round cannot start unless the current reserve split matches the target. If later trades change the split, use **Restore target allocation** before starting the next round. Read the side reserves before trading: a quote cannot be sold if its side reserve is insufficient.
-9. If the three tokens have not yet been issued, use **Initialize fixed token economy** once. For a trade, choose Buy or Sell, a quote side, and a gross whole-number amount in atomic units. Review the public fee and net output before submitting through Lace. A trade may also distribute KAI while fixed inventory remains.
+8. A new round cannot start unless the current reserve split matches the target. If later trades change the split, open **Treasury** and use **Restore target allocation** before starting the next round. Read the side reserves before trading: a quote cannot be sold if its side reserve is insufficient.
+   The Treasury panel reads public contract history for resolution, expiry, and restoration actions. Each entry records the round, result, target, reserves, and fee pool after the action. The contract history does not store transaction IDs or timestamps; the latest finalized transaction receipt in this browser is session-only.
+9. If the three tokens have not yet been issued, use **Initialize fixed token economy** once in **Trading Engine**. For a trade, choose Buy or Sell, a quote side, and a gross whole-number amount in atomic units. Review the public fee and net output before submitting through the connected wallet. A trade may also distribute KAI while fixed inventory remains.
 
 The economic circuits compile and pass local accounting tests, but no issuance or trade has been confirmed on Preprod yet. Treasury allocation changes internal redemption limits, not external liquidity. There is no yield, market-signal reward, or KAI redemption promise. Trading uses public unshielded assets; direct transfers outside Kairos do not pay its fee.
 
@@ -30,7 +32,7 @@ Token issuance, trade side, gross amount, fee, payout address, reserve values, a
 
 - **No Lace wallet:** open the app in the browser profile where Midnight Lace is installed and enabled. Allow the extension to access `localhost:3000`, then reload the page.
 - **Wrong network:** switch Lace to Midnight Preprod, then reconnect. Lace may report this during connection as `Network ID mismatch`.
-- **Proof server unavailable:** run `npm run proof:up` and `npm run proof:status`; the browser must reach `http://127.0.0.1:6301/health`. Lace's local-proving setting separately uses a trusted service at `http://localhost:6300`.
+- **Proof server unavailable:** run `npm run proof:up` and `npm run proof:status` on your device; the browser must reach `http://127.0.0.1:6301/health`. On a public HTTPS deployment, grant the browser's Local Network Access permission for that origin. Lace's local-proving setting separately uses a trusted service at `http://localhost:6300`.
 - **No public state:** confirm the 64-character address belongs to a deployed Preprod contract, then retry after indexer propagation.
 - **Verifier rejects the address:** confirm that the transaction ID belongs to that deployment and that the browser was refreshed after the latest contract compile. An older Kairos deployment needs its matching older artifacts and cannot verify as the current build.
 - **Proof or submission error:** retain the opening file, check DUST, Lace prompts, proof server health, and the current round before retrying. If Kairos shows a submitted transaction ID while finalization remains pending, record it and check Preprod before retrying; submission alone does not prove success.

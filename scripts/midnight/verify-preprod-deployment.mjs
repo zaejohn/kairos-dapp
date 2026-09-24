@@ -19,6 +19,7 @@ const DEPLOY_QUERY = `query Deployment($address: HexEncoded!) {
     __typename
     ... on ContractDeploy {
       transaction {
+        hash
         block { height timestamp }
         ... on RegularTransaction { identifiers transactionResult { status } }
       }
@@ -26,6 +27,7 @@ const DEPLOY_QUERY = `query Deployment($address: HexEncoded!) {
     ... on ContractCall {
       deploy {
         transaction {
+          hash
           block { height timestamp }
           ... on RegularTransaction { identifiers transactionResult { status } }
         }
@@ -59,8 +61,9 @@ async function deploymentTransaction(address) {
 async function verify(address, txId) {
   setNetworkId("preprod");
   const transaction = await deploymentTransaction(address);
-  if (!transaction.identifiers?.some((identifier) => identifier.toLowerCase() === txId)) {
-    fail("The supplied transaction ID does not identify this contract deployment.");
+  if (transaction.hash?.toLowerCase() !== txId &&
+      !transaction.identifiers?.some((identifier) => identifier.toLowerCase() === txId)) {
+    fail("The supplied transaction hash or identifier does not identify this contract deployment.");
   }
   if (transaction.transactionResult?.status !== "SUCCESS" || !Number.isInteger(transaction.block?.height)) {
     fail(`Deployment is not a finalized full success (status: ${transaction.transactionResult?.status ?? "unavailable"}).`);
@@ -85,6 +88,8 @@ async function verify(address, txId) {
     network: "preprod",
     contractAddress: address,
     deploymentTxId: txId,
+    deploymentTxHash: transaction.hash,
+    deploymentIdentifiers: transaction.identifiers,
     deploymentStatus: transaction.transactionResult.status,
     deploymentBlock: transaction.block.height,
     deploymentTimestamp: transaction.block.timestamp,
@@ -99,7 +104,7 @@ async function verify(address, txId) {
 
 const [addressInput, txInput] = process.argv.slice(2);
 if (!addressInput || !txInput || !HEX_32.test(addressInput) || !TX_IDENTIFIER.test(txInput)) {
-  console.error("Usage: npm run verify:preprod -- <64-hex-contract-address> <64-or-66-hex-deployment-tx-id>");
+  console.error("Usage: npm run verify:preprod -- <64-hex-contract-address> <64-hex-transaction-hash-or-66-hex-identifier>");
   process.exitCode = 2;
 } else {
   verify(addressInput.toLowerCase(), txInput.toLowerCase())

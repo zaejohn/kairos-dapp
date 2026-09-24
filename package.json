@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=22.22 <23"
   },
   "scripts": {
     "dev": "next dev",
@@ -16,7 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "test:contracts": "vitest run --config vitest.contract.config.ts",
     "test:e2e": "playwright test",
-    "verify:fast": "npm run lint && npm run typecheck && npm run test && npm run test:activity-verifier",
+    "verify:fast": "npm run lint && npm run typecheck && npm run test && npm run test:activity-verifier && npm run test:vercel-env",
     "verify": "npm run compact:compile && npm run test:contracts && npm run verify:fast && npm run build",
     "proof:up": "docker compose -f infra/midnight/proof-server.yml up -d",
     "proof:down": "docker compose -f infra/midnight/proof-server.yml down",
@@ -26,6 +26,7 @@
     "verify:preprod": "node scripts/midnight/verify-preprod-deployment.mjs",
     "verify:activity": "node scripts/midnight/verify-preprod-activity.mjs",
     "test:activity-verifier": "node --test tests/node/preprod-activity.test.mjs",
+    "test:vercel-env": "node --test tests/node/vercel-env.test.mjs",
     "compact:version": "compact compile --version",
     "compact:compile": "node scripts/midnight/compile-contracts.mjs",
     "agent:doctor": "node scripts/agent/doctor.mjs",

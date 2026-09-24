@@ -16,8 +16,8 @@ const successfulCall = {
 function indexer(transactions) {
   return async (_url, options) => {
     const request = JSON.parse(options.body);
-    assert.equal(request.variables.identifier, txId);
-    assert.match(request.query, /transactions\(offset: \{ identifier: \$identifier \}\)/);
+    assert.equal(request.variables.reference, txId);
+    assert.match(request.query, /transactions\(offset: \{ identifier: \$reference \}\)/);
     return { ok: true, json: async () => ({ data: { transactions } }) };
   };
 }
@@ -25,6 +25,16 @@ function indexer(transactions) {
 test("accepts only a finalized successful call on the exact contract and circuit", async () => {
   const result = await verifyPreprodActivity(address, txId, "commitPosition", indexer([successfulCall]));
   assert.deepEqual([result.status, result.blockHeight, result.circuitId], ["SUCCESS", 123, "commitPosition"]);
+});
+
+test("accepts the transaction hash returned by Midnight.js", async () => {
+  const result = await verifyPreprodActivity(address, successfulCall.hash, "commitPosition", async (_url, options) => {
+    const request = JSON.parse(options.body);
+    assert.equal(request.variables.reference, successfulCall.hash);
+    assert.match(request.query, /transactions\(offset: \{ hash: \$reference \}\)/);
+    return { ok: true, json: async () => ({ data: { transactions: [successfulCall] } }) };
+  });
+  assert.equal(result.transactionHash, successfulCall.hash);
 });
 
 test("rejects a different contract or circuit even when the transaction succeeded", async () => {

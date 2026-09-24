@@ -79,12 +79,16 @@ try {
   now = firstClose;
   settleBalances();
   await prove("resolveRound", contract.circuits.resolveRound(context, openings, 490n));
-  await prove("rebalanceTreasury", contract.circuits.rebalanceTreasury(context, 490n));
+  // A later trade changes the reserve split; restoration must be a real action.
+  context = contract.circuits.buyQuote(context, 0n, 10_000n, 100n, recipient).context;
+  quoteAInventory -= 9_900n;
+  settleBalances();
+  await prove("rebalanceTreasury", contract.circuits.rebalanceTreasury(context, 7_420n));
   await prove("startNextRound", contract.circuits.startNextRound(context));
 
   now = firstClose + 604_800 + 86_400;
   settleBalances();
-  await prove("expireRound", contract.circuits.expireRound(context, 490n));
+  await prove("expireRound", contract.circuits.expireRound(context, 7_420n));
 
   console.log(JSON.stringify({ ok: true, network: "local proof server only", proofs }, null, 2));
 } catch (error) {

@@ -7,8 +7,8 @@ const CIRCUITS = new Set([
   "initializeEconomy", "buyQuote", "sellQuote", "commitPosition",
   "resolveRound", "expireRound", "rebalanceTreasury", "startNextRound",
 ]);
-const TRANSACTION_QUERY = `query TransactionByIdentifier($identifier: HexEncoded) {
-  transactions(offset: { identifier: $identifier }) {
+const transactionQuery = (offsetKey) => `query TransactionByReference($reference: HexEncoded) {
+  transactions(offset: { ${offsetKey}: $reference }) {
     __typename
     hash
     block { height timestamp }
@@ -27,10 +27,12 @@ export async function verifyPreprodActivity(address, txId, circuitId, fetchImpl 
   if (!HEX_32.test(address) || !TX_IDENTIFIER.test(txId) || !CIRCUITS.has(circuitId)) {
     throw new Error("Expected a 64-hex contract address, 64- or 66-hex transaction ID, and Kairos circuit ID.");
   }
+  const reference = txId.toLowerCase();
+  const offsetKey = reference.length === 64 ? "hash" : "identifier";
   const response = await fetchImpl(INDEXER_HTTP, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: TRANSACTION_QUERY, variables: { identifier: txId.toLowerCase() } }),
+    body: JSON.stringify({ query: transactionQuery(offsetKey), variables: { reference } }),
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(`Preprod indexer returned HTTP ${response.status}.`);
@@ -40,9 +42,10 @@ export async function verifyPreprodActivity(address, txId, circuitId, fetchImpl 
   }
   const transaction = body.data?.transactions?.find((candidate) =>
     candidate.__typename === "RegularTransaction"
-    && candidate.identifiers?.some((identifier) => identifier.toLowerCase() === txId.toLowerCase()),
+    && (candidate.hash?.toLowerCase() === reference
+      || candidate.identifiers?.some((identifier) => identifier.toLowerCase() === reference)),
   );
-  if (!transaction) throw new Error("No finalized regular transaction has this identifier on Preprod.");
+  if (!transaction) throw new Error("No finalized regular transaction has this hash or identifier on Preprod.");
   if (transaction.transactionResult?.status !== "SUCCESS" || !Number.isInteger(transaction.block?.height)) {
     throw new Error(`Transaction is not a finalized full success (status: ${transaction.transactionResult?.status ?? "unavailable"}).`);
   }
@@ -67,7 +70,7 @@ export async function verifyPreprodActivity(address, txId, circuitId, fetchImpl 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [address, txId, circuitId] = process.argv.slice(2);
   if (!address || !txId || !circuitId) {
-    console.error("Usage: npm run verify:activity -- <64-hex-contract-address> <64-or-66-hex-transaction-id> <Kairos-circuit-id>");
+    console.error("Usage: npm run verify:activity -- <64-hex-contract-address> <64-hex-transaction-hash-or-66-hex-identifier> <Kairos-circuit-id>");
     process.exitCode = 2;
   } else {
     verifyPreprodActivity(address, txId, circuitId)

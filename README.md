@@ -5,18 +5,21 @@
 ## Live Demo
 
 No public demo URL has been verified. Run the app locally using the instructions below.
+For an owner-managed public deployment, follow [the Vercel Preprod guide](docs/DEPLOY_VERCEL.md). The production build refuses to publish an unverified contract address.
 
 ## Contract Address
 
 | Network | Address |
 | --- | --- |
-| Preprod | Deployment not yet verified |
+| Preprod | `ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f` |
+
+Deployment transaction hash: `ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc`. The Preprod indexer reports `SUCCESS` in block 2,686,941; all eight deployed verifier keys match this repository's current artifact. Run the read-only verification command below to recheck the live state. No post-deployment circuit call has been verified yet.
 
 ## What This Product Does
 
 Kairos is building a self-rebalancing treasury driven by private market conviction. The Compact contract accepts eight salted quote-side commitments before a public weekly close, proves that all eight openings match the public commitments during a one-day resolution window, and publishes one winner. In the same resolution call it sets a 70/30 target for the winning side and reapportions internal NIGHT redemption capacity; a tie retains the previous target. Missing openings let anyone expire the round after the window and reapply the existing target. The next round starts only while the current reserve split matches that target.
 
-The same contract now compiles with a fixed, one-time contract-custodied issuance of Quote A, Quote B, and KAI; public NIGHT/quote buy and sell routes with asymmetric basis-point fees; a fixed-supply KAI trade incentive; and a separate repair call for reserve splits changed by later trades. These circuits and their accounting tests have **local evidence only**. No issuance, trade, reserve change, or finalized deployment has been observed on Preprod. The route does not provide an external exchange or guarantee redemption when a side reserve is depleted. Wallet-to-wallet transfers bypass Kairos fees, so no token-wide tax is claimed.
+The same contract now compiles with a fixed, one-time contract-custodied issuance of Quote A, Quote B, and KAI; public NIGHT/quote buy and sell routes with asymmetric basis-point fees; a fixed-supply KAI trade incentive; and a separate repair call for reserve splits changed by later trades. Resolution, expiry, and restoration append public treasury-action records; the UI reads the latest ten. These circuits and their accounting tests have **local evidence only** beyond deployment. No issuance, trade, or reserve change has been observed on Preprod. The route does not provide an external exchange or guarantee redemption when a side reserve is depleted. Wallet-to-wallet transfers bypass Kairos fees, so no token-wide tax is claimed.
 
 ## Initial Idea
 
@@ -24,7 +27,7 @@ Kairos aims to let private weekly market conviction guide a public DeFi treasury
 
 ## Privacy Model
 
-- **Public:** round close time, transaction timing, commitment order/count and hashes, round phase, winner, allocation targets, token colors, reserves, fees, trade side/amount/recipient, and KAI distribution total.
+- **Public:** round close time, transaction timing, commitment order/count and hashes, round phase, winner, allocation targets, token colors, reserves, fees, trade side/amount/recipient, KAI distribution total, and historical treasury-action accounting.
 - **Private from the public ledger:** the side and random salt supplied to each commitment circuit, and the eight openings supplied to the resolution circuit.
 - **Proved:** every opening matches its indexed commitment and the published winner follows the complete eight-opening tally.
 
@@ -40,7 +43,7 @@ Next.js 16, React 19, TypeScript, Compact language 0.23/compiler 0.31.1, Midnigh
 
 ## Prerequisites
 
-Node.js 22, npm, Docker, Compact compiler 0.31.1, a Preprod Lace wallet for transactions, and Preprod DUST. On Windows, install Compact in WSL Ubuntu; the Windows `compact.exe` is an unrelated system tool.
+Node.js 22.22 or newer within 22.x, npm, Docker, Compact compiler 0.31.1, a Preprod Lace wallet for transactions, and Preprod DUST. On Windows, install Compact in WSL Ubuntu; the Windows `compact.exe` is an unrelated system tool.
 
 ## Setup & Run Locally
 
@@ -62,7 +65,7 @@ npm run verify:preprod -- <contract-address> <deployment-transaction-id>
 
 The command reports public state only. It cannot verify a missing address or substitute for a successful wallet transaction.
 
-For a later finalized circuit call, check its transaction identifier against the exact contract address and expected entry point:
+For a later finalized circuit call, check its transaction hash or identifier against the exact contract address and expected entry point:
 
 ```text
 npm run verify:activity -- <contract-address> <transaction-id> <Kairos-circuit-id>
@@ -109,4 +112,4 @@ Target: 50 verified Preprod users. Current verified count: **0/50**. See [USERS.
 
 ## Project Status
 
-See [the Level 1–5 evidence table](docs/challenge/IMPLEMENTATION_STATUS.md) and [docs/agent/STATE.md](docs/agent/STATE.md). There is no verified deployment address, public demo, hosted CI badge, organizer approval, or user feedback yet.
+See [the Level 1–5 evidence table](docs/challenge/IMPLEMENTATION_STATUS.md) and [docs/agent/STATE.md](docs/agent/STATE.md). The current contract deployment is verified; there is no verified circuit call, public demo, hosted CI badge, organizer approval, or user feedback yet.
