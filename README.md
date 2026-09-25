@@ -66,7 +66,7 @@ An on-chain observer can see a commitment's hash, index, and transaction timing,
    ```
 
 3. Open `http://localhost:3000`. Select **Enter the Garage**, then use the workshop stations or the tablet/mobile navigation. The configured contract loads automatically; regular users do not deploy or type a contract address.
-4. For Lace transactions, also start/configure Lace's **separate** trusted proof service on port 6300 as described in the [Vercel and local proof guide](docs/DEPLOY_VERCEL.md). In **Settings**, enter a strong local storage password and select **Check local proof server**. Grant the browser's Local Network Access prompt if it appears. The password protects local Midnight signing-key storage; it is not a recovery phrase.
+4. For Lace transactions, also start/configure Lace's **separate** trusted proof service on port 6300 as described in the [Vercel and local proof guide](docs/DEPLOY_VERCEL.md). In **Settings**, enter a strong local storage password, select **Save password**, confirm it is saved for this browser session, and select **Check local proof server**. Grant the browser's Local Network Access prompt if it appears. The password protects local Midnight signing-key storage; it is not a recovery phrase.
 
 `npm run compact:compile` generates `contracts/managed/kairos` (contract code, circuits, and keys) and `public/zk/kairos` (browser proving assets). Both directories are **generated and Git-ignored**, so they are present after compilation locally and in the build, not in a fresh Git checkout. If the challenge requires `managed/` to be committed rather than generated during judging, this repository does not currently meet that literal interpretation.
 
@@ -110,7 +110,7 @@ It queries the [Midnight Preprod indexer](https://indexer.preprod.midnight.netwo
 
 ### Verify an actual frontend circuit call
 
-1. On the [public demo](https://kairos-dapp.vercel.app) in the browser profile with Preprod Lace, select **Enter the Garage**, then **Wallet** and connect Lace. In **Settings**, supply the local storage password and confirm the local proof server. The wallet should show Preprod and the connected addresses/balance.
+1. On the [public demo](https://kairos-dapp.vercel.app) in the browser profile with Preprod Lace, select **Enter the Garage**, then **Wallet** and connect Lace. In **Settings**, enter and **save** the local storage password, then confirm the local proof server. The wallet should show Preprod and the connected addresses/balance.
 2. Open **Trading Engine** before the round close. Choose a side, prepare and download its opening file, acknowledge that it is saved, then submit the commitment and approve the wallet request. Keep the opening private.
 3. Wait for a **finalized** receipt. Record its public transaction hash or identifier and refresh public state. A pending or merely submitted transaction is insufficient.
 4. From the repository root, run:

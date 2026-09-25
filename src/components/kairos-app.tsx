@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/ledger";
+import { PasswordValidationError, validatePassword } from "@midnight-ntwrk/midnight-js-utils";
 import type { WalletConnection, WalletOption } from "@/lib/midnight/wallet";
 import {
   connectMidnightWallet,
@@ -165,6 +166,7 @@ export function KairosApp({
     initialContractAddress,
   );
   const [password, setPassword] = useState("");
+  const [passwordDraft, setPasswordDraft] = useState("");
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [side, setSide] = useState<0 | 1>(0);
   const [tradeSide, setTradeSide] = useState<QuoteSide>(0);
@@ -296,6 +298,10 @@ export function KairosApp({
   async function getClient() {
     if (!wallet)
       throw new AppError("WALLET_REQUIRED", "Connect a Midnight wallet first.");
+    if (passwordDraft)
+      throw new AppError("PASSWORD_UNSAVED", "Save or clear the password change in Settings before submitting a transaction.");
+    if (!password)
+      throw new AppError("PASSWORD_REQUIRED", "Enter and save a local storage password in Settings before submitting a transaction.");
     reportTransactionProgress({ stage: "preparing" });
     const { createMarketClient } = await import("@/lib/midnight/market-client");
     return createMarketClient(
@@ -303,6 +309,21 @@ export function KairosApp({
       password,
       reportTransactionProgress,
     );
+  }
+
+  function saveStoragePassword() {
+    try {
+      validatePassword(passwordDraft);
+    } catch (cause) {
+      if (cause instanceof PasswordValidationError) {
+        showToast("error", "Enter a stronger local storage password: 16+ characters, three character types, and no simple repeats or sequences.", undefined, false, "storage-password");
+        return;
+      }
+      throw cause;
+    }
+    setPassword(passwordDraft);
+    setPasswordDraft("");
+    showToast("success", "Local storage password saved for this browser session.", undefined, false, "storage-password");
   }
 
   function selectWallet(option: WalletOption) {
@@ -421,6 +442,7 @@ export function KairosApp({
     setWalletBalances(null);
     setWalletBalanceStatus("idle");
     setPassword("");
+    setPasswordDraft("");
     setSide(0);
     setTradeSide(0);
     setTradeDirection("buy");
@@ -1486,16 +1508,35 @@ export function KairosApp({
               <input
                 id="local-password"
                 type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="16+ characters, 3 character classes"
+                value={passwordDraft}
+                onChange={(event) => setPasswordDraft(event.target.value)}
+                placeholder={password ? "Enter a new password to update" : "16+ characters, 3 character classes"}
                 autoComplete="new-password"
               />
               <p className="fine-print">
                 Required on this device for Kairos transactions. It encrypts
                 Midnight signing keys in this browser and is never sent to
                 Kairos. Keep it safe; changing it may make existing local keys
-                inaccessible.
+                inaccessible. The saved password lasts until you disconnect or reload.
+              </p>
+              <div className="action-row">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={!passwordDraft || Boolean(busy)}
+                  onClick={saveStoragePassword}
+                >
+                  {password ? "Update password" : "Save password"}
+                </button>
+              </div>
+              <p className="fine-print" role="status">
+                {passwordDraft
+                  ? password
+                    ? "A password is saved; save or clear this change before submitting."
+                    : "Password not saved yet."
+                  : password
+                    ? "Password saved for this browser session."
+                    : "No password saved for this browser session."}
               </p>
               <div className="action-row">
                 <button

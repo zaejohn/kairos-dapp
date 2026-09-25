@@ -104,6 +104,7 @@ test("loads verifier keys and reaches wallet balancing after confirming connecti
   await page.getByRole("button", { name: "LACE", exact: true }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
   await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
+  await page.getByRole("button", { name: "Save password" }).click();
   await page.getByText("Local developer controls").click();
   await page.getByRole("button", { name: "Deploy new Preprod contract" }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { walletStatusChecks: () => number }).walletStatusChecks())).toBe(2);
@@ -187,6 +188,7 @@ test("lists both injected wallets and connects only the selected provider", asyn
   await page.getByRole("button", { name: "Refresh wallet balances" }).click();
   await expect(page.getByText("4200")).toBeVisible();
   await page.getByLabel("Local storage password").fill("StrongLocalPassword123!");
+  await page.getByRole("button", { name: "Save password" }).click();
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await page.getByRole("button", { name: "Disconnect in Kairos" }).click();
@@ -195,5 +197,6 @@ test("lists both injected wallets and connects only the selected provider", asyn
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
   await expect(page.getByLabel("Local storage password")).toBeEmpty();
+  await expect(page.getByText("No password saved for this browser session.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh wallet balances" })).toBeDisabled();
 });
