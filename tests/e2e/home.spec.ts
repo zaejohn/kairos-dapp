@@ -1,8 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function enterGarage(page: Page) {
+  await page.getByRole("button", { name: "Enter the Garage" }).click();
+  await expect(page.getByRole("dialog", { name: "KAIROS startup" })).toBeHidden();
+}
 
 test("shows only the workshop and footer on desktop, with usable image stations", async ({ page }) => {
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  await enterGarage(page);
   await expect(page.getByRole("img", { name: /Kairos workshop/ })).toBeVisible();
   await expect(page.locator("main > footer")).toBeVisible();
   await expect(page.locator("main > .home-artwork")).toBeVisible();
@@ -20,6 +25,7 @@ test("shows only the workshop and footer on desktop, with usable image stations"
 test("mobile station navigation opens the matching dialogs", async ({ page }) => {
   await page.setViewportSize({ width: 820, height: 1180 });
   await page.goto("/");
+  await enterGarage(page);
   await expect(page.getByRole("navigation", { name: "Kairos stations" })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForLoadState("networkidle");
@@ -107,7 +113,7 @@ test("explains Lace's Preprod network mismatch", async ({ page }) => {
     });
   });
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  await enterGarage(page);
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await page.getByRole("button", { name: "LACE", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Wallet" })).toBeVisible();
@@ -141,7 +147,7 @@ test("loads verifier keys and reaches wallet balancing after confirming connecti
     });
   });
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  await enterGarage(page);
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await page.getByRole("button", { name: "LACE", exact: true }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
@@ -163,7 +169,7 @@ test("queries the Preprod indexer with browser fetch", async ({ page }) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { contractAction: null } }) });
   });
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  await enterGarage(page);
   await page.getByRole("button", { name: "Open Settings" }).click();
   await page.getByText("Local developer controls").click();
   await page.getByLabel("Preprod contract address").fill("a".repeat(64));
@@ -188,7 +194,7 @@ test("explains missing shielded keys at connection before deployment", async ({ 
     });
   });
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  await enterGarage(page);
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await page.getByRole("button", { name: "LACE", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "did not provide valid preprod shielded public keys" })).toBeVisible();
@@ -215,7 +221,7 @@ test("lists both injected wallets and connects only the selected provider", asyn
     });
   });
   await page.goto("/");
-  await page.waitForLoadState("networkidle");
+  await enterGarage(page);
   await page.getByRole("button", { name: "Open Wallet" }).click();
   await expect(page.getByRole("button", { name: "1AM", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "LACE", exact: true })).toBeVisible();
@@ -239,6 +245,6 @@ test("lists both injected wallets and connects only the selected provider", asyn
   await page.getByRole("button", { name: "Close dialog" }).click();
   await page.getByRole("button", { name: "Open Settings" }).click();
   await expect(page.getByLabel("Local storage password")).toBeEmpty();
-  await expect(page.getByText("No password saved for this browser session.")).toBeVisible();
+  await expect(page.getByText("No password saved in this tab.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Refresh wallet balances" })).toBeDisabled();
 });
