@@ -7,6 +7,7 @@ const site = publicSiteUrl();
 export const metadata: Metadata = {
   title: "Kairos | Private market signal on Midnight",
   description: "A bounded private market signal that sets a public treasury allocation policy on Midnight Preprod.",
+  icons: { icon: [{ url: "/kairos-logo.png", type: "image/png" }] },
   metadataBase: site ?? undefined,
   alternates: site ? { canonical: "/" } : undefined,
   robots: { index: Boolean(site), follow: Boolean(site) },

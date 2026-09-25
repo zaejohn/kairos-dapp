@@ -47,6 +47,19 @@ const stations = [
 ] as const;
 
 const nightTokenType = nativeToken().raw;
+const starPerNight = 1_000_000n;
+
+function formatNightBalance(stars: bigint): string {
+  const whole = (stars / starPerNight)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const fractional = (stars % starPerNight)
+    .toString()
+    .padStart(6, "0")
+    .replace(/0+$/, "")
+    .padEnd(2, "0");
+  return `${whole}.${fractional} NIGHT`;
+}
 
 function compactWalletAddress(address: string): string {
   if (address.length <= 33) return address;
@@ -184,6 +197,7 @@ export function KairosApp({
   const walletBalanceGeneration = useRef(0);
   const addressGeneration = useRef(0);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const nightBalance = walletBalances?.[nightTokenType];
 
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((notice) => notice.id !== id));
@@ -626,7 +640,10 @@ export function KairosApp({
         ))}
       </nav>
       <footer>
-        <span>KAIROS</span>
+        <span className="footer-brand">
+          <Image src="/kairos-logo.png" alt="" width={48} height={48} />
+          <span>KAIROS</span>
+        </span>
         <span>Private signal · Public policy · Contract-custodied trading</span>
       </footer>
       {!active && <ToastViewport notices={toasts} onDismiss={dismissToast} />}
@@ -874,12 +891,14 @@ export function KairosApp({
                   <span className="eyebrow">CONNECTED NETWORK · MIDNIGHT {wallet.networkId.toUpperCase()}</span>
                   <strong>{wallet.name}</strong>
                   <div className="wallet-balance-summary">
-                    <span className="field-label">Unshielded NIGHT balance · atomic units</span>
+                    <span className="field-label">Unshielded NIGHT balance</span>
                     <strong>
                       {walletBalanceStatus === "loading"
                         ? "Reading wallet…"
                         : walletBalanceStatus === "ready"
-                          ? walletBalances?.[nightTokenType]?.toString() ?? "No NIGHT balance reported"
+                          ? nightBalance === undefined
+                            ? "No NIGHT balance reported"
+                            : formatNightBalance(nightBalance)
                           : "Balance unavailable"}
                     </strong>
                     <button type="button" disabled={walletBalanceStatus === "loading"} onClick={() => void refreshWalletBalances(true)}>
@@ -1381,7 +1400,7 @@ export function KairosApp({
                 <p>
                   Read directly from your connected wallet. NIGHT is the native
                   token; other labels require matching loaded Kairos contract
-                  colors. Amounts are shown in atomic units.
+                  colors. NIGHT is shown in NIGHT; other token amounts remain in atomic units.
                 </p>
                 <div className="action-row">
                   <button
@@ -1423,7 +1442,11 @@ export function KairosApp({
                                     ? "KAI"
                                     : `Token ${shortenAddress(type, 6)}`}
                             </span>
-                            <strong>{amount.toString()}</strong>
+                            <strong>
+                              {type.toLowerCase() === nightTokenType
+                                ? formatNightBalance(amount)
+                                : amount.toString()}
+                            </strong>
                           </div>
                         ))
                     )}
