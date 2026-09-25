@@ -19,6 +19,11 @@ import {
   parseResolutionBundle,
   type SavedOpening,
 } from "@/lib/market/openings";
+import {
+  loadPositionReceipts,
+  savePositionReceipt,
+  type PositionReceipt,
+} from "@/lib/market/position-receipts";
 import type {
   MarketSnapshot,
   PublicTreasuryAction,
@@ -175,7 +180,7 @@ export function KairosApp({
   const [tradeDirection, setTradeDirection] = useState<TradeDirection>("buy");
   const [tradeAmount, setTradeAmount] = useState("");
   const [prepared, setPrepared] = useState<SavedOpening | null>(null);
-  const [sessionPositions, setSessionPositions] = useState<PositionPreview[]>(
+  const [positionReceipts, setPositionReceipts] = useState<(PositionReceipt & { side?: 0 | 1 })[]>(
     [],
   );
   const [importedPosition, setImportedPosition] =
@@ -216,6 +221,19 @@ export function KairosApp({
   const notifyChart = useCallback((kind: ToastKind, message: string) => {
     showToast(kind, message, undefined, false, "chart-feed");
   }, [showToast]);
+
+  function restorePositionReceipts(connectedWallet: WalletConnection, address: string) {
+    if (!isContractAddress(address)) {
+      setPositionReceipts([]);
+      return;
+    }
+    try {
+      setPositionReceipts(loadPositionReceipts(window.localStorage, connectedWallet.shieldedAddress, address));
+    } catch {
+      setPositionReceipts([]);
+      showToast("warning", "Saved receipts could not be loaded from this browser. Check site storage access.", undefined, false, "position-receipts");
+    }
+  }
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -366,6 +384,7 @@ export function KairosApp({
     void connection
       .then((connected) => {
         setWallet(connected);
+        restorePositionReceipts(connected, contractAddress);
         addressGeneration.current++;
         setAdditionalAddresses(null);
         setAddressStatus("idle");
@@ -480,7 +499,7 @@ export function KairosApp({
     setTradeDirection("buy");
     setTradeAmount("");
     setPrepared(null);
-    setSessionPositions([]);
+    setPositionReceipts([]);
     setImportedPosition(null);
     setSaved(false);
     setBundle("");
@@ -839,6 +858,7 @@ export function KairosApp({
                       void run(
                         "proving",
                         async () => {
+                          if (!wallet) throw new AppError("WALLET_REQUIRED", "Connect a Midnight wallet first.");
                           const client = await getClient();
                           const result = await client.commit(
                             contractAddress,
@@ -847,15 +867,22 @@ export function KairosApp({
                             openingSaltBytes(prepared),
                           );
                           recordFinalizedReceipt(result, "Commitment finalized on Preprod. Keep your opening file private.");
-                          setSessionPositions((current) =>
+                          try {
+                            savePositionReceipt(window.localStorage, wallet.shieldedAddress, contractAddress, {
+                              round: prepared.round,
+                              receipt: result,
+                            });
+                          } catch {
+                            showToast("warning", "Commitment finalized, but this browser could not save its receipt. Keep your transaction ID and opening file.", undefined, false, "position-receipts");
+                          }
+                          setPositionReceipts((current) =>
                             [
                               {
-                                contractAddress: prepared.contractAddress,
                                 round: prepared.round,
                                 side: prepared.side,
                                 receipt: result,
                               },
-                              ...current,
+                              ...current.filter((entry) => entry.receipt.txId !== result.txId),
                             ].slice(0, 8),
                           );
                           setPrepared(null);
@@ -877,11 +904,11 @@ export function KairosApp({
                 eight opening files; it and its proof server see their contents.
               </p>
               <details className="position-vault">
-                <summary>My position files and session receipts</summary>
+                <summary>My position files and receipts</summary>
                 <p>
-                  Only this browser session remembers finalized submissions.
-                  Your downloaded opening file is the backup needed for
-                  resolution; Kairos never uploads it from this control.
+                  Connect the same wallet to see locally saved finalized receipts after a refresh.
+                  Your private opening stays in the JSON file you downloaded; select it again
+                  to preview it. Kairos does not store its side or salt in browser storage.
                 </p>
                 <label className="field-label" htmlFor="opening-preview">
                   Preview a saved opening locally
@@ -908,24 +935,24 @@ export function KairosApp({
                     </small>
                   </div>
                 )}
-                {sessionPositions.length === 0 && (
+                {positionReceipts.length === 0 && (
                   <p>
-                    No finalized position has been recorded in this browser
-                    session.
+                    {wallet
+                      ? "No finalized receipt is saved for this wallet and contract in this browser."
+                      : "Connect the wallet used to submit your commitment to load saved receipts."}
                   </p>
                 )}
-                {sessionPositions.map((position) => (
-                  <div className="position-row" key={position.receipt?.txId}>
+                {positionReceipts.map((position) => (
+                  <div className="position-row" key={position.receipt.txId}>
                     <span>
-                      Finalized in block {position.receipt?.blockHeight}
+                      Finalized in block {position.receipt.blockHeight}
                     </span>
                     <strong>
-                      Round {position.round} · Quote{" "}
-                      {position.side === 0 ? "A" : "B"}
+                      Round {position.round} · {position.side === undefined ? "Quote in your opening file" : `Quote ${position.side === 0 ? "A" : "B"}`}
                     </strong>
                     <small>
                       Transaction{" "}
-                      {shortenAddress(position.receipt?.txId ?? "", 8)}
+                      {shortenAddress(position.receipt.txId, 8)}
                     </small>
                   </div>
                 ))}
@@ -1629,6 +1656,7 @@ export function KairosApp({
                       activeAddress.current = next;
                       loadGeneration.current++;
                       setContractAddress(next);
+                      if (wallet) restorePositionReceipts(wallet, next);
                       setSnapshot(null);
                       setPrepared(null);
                       setSaved(false);
@@ -1652,6 +1680,7 @@ export function KairosApp({
                             activeAddress.current = deployed.contractAddress;
                             loadGeneration.current++;
                             setContractAddress(deployed.contractAddress);
+                            if (wallet) restorePositionReceipts(wallet, deployed.contractAddress);
                             recordFinalizedReceipt(deployed.receipt,
                               "Kairos contract finalized on Preprod. Save its public address.",
                             );

@@ -31,9 +31,10 @@ test("mobile station navigation opens the matching dialogs", async ({ page }) =>
 
 test("previews an opening in the browser without treating it as a finalized position", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Enter the Garage" }).click();
   await page.waitForLoadState("networkidle");
   await page.getByRole("button", { name: "Open Trading Engine" }).click();
-  await page.getByText("My position files and session receipts").click();
+  await page.getByText("My position files and receipts").click();
   await page.getByLabel("Preview a saved opening locally").setInputFiles({
     name: "kairos-opening-round-3.json",
     mimeType: "application/json",
@@ -47,8 +48,49 @@ test("previews an opening in the browser without treating it as a finalized posi
   });
   await expect(page.getByText("Imported file · Unverified on-chain")).toBeVisible();
   await expect(page.getByText("Round 3 · Quote B")).toBeVisible();
-  await expect(page.getByText("No finalized position has been recorded in this browser session.")).toBeVisible();
+  await expect(page.getByText("Connect the wallet used to submit your commitment to load saved receipts.")).toBeVisible();
   await expect(page.getByText("b".repeat(64))).toHaveCount(0);
+});
+
+test("restores public position receipts after refresh for the same wallet and contract", async ({ page }) => {
+  const contract = "a".repeat(64);
+  const walletAddress = "test-shielded-address";
+  const txId = "c".repeat(64);
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "midnight", {
+      value: {
+        lace: {
+          rdns: "io.lace.wallet", apiVersion: "4.0.1",
+          connect: async () => ({
+            getConnectionStatus: async () => ({ status: "connected", networkId: "preprod" }),
+            getShieldedAddresses: async () => ({ shieldedAddress: "test-shielded-address", shieldedCoinPublicKey: "11".repeat(32), shieldedEncryptionPublicKey: "22".repeat(32) }),
+          }),
+        },
+      },
+    });
+  });
+  await page.goto("/");
+  await page.evaluate(({ key, saved }) => localStorage.setItem(key, JSON.stringify(saved)), {
+    key: `kairos:preprod:position-receipts:v1:${walletAddress}:${contract}`,
+    saved: [{ round: 3, receipt: { txId, blockHeight: 2700501 } }],
+  });
+
+  for (let visit = 0; visit < 2; visit++) {
+    if (visit > 0) await page.reload();
+    await page.getByRole("button", { name: "Enter the Garage" }).click();
+    await page.getByRole("button", { name: "Open Settings" }).click();
+    await page.getByText("Local developer controls").click();
+    await page.getByLabel("Preprod contract address").fill(contract);
+    await page.getByRole("button", { name: "Close dialog" }).click();
+    await page.getByRole("button", { name: "Open Wallet" }).click();
+    await page.getByRole("button", { name: "LACE", exact: true }).click();
+    await page.getByRole("button", { name: "Open Trading Engine" }).click();
+    await page.getByText("My position files and receipts").click();
+    await expect(page.getByText("Round 3 · Quote in your opening file")).toBeVisible();
+    await expect(page.getByText("Finalized in block 2700501")).toBeVisible();
+    await expect(page.getByText(/Transaction c{8}/)).toBeVisible();
+    await expect(page.getByText("Imported file · Unverified on-chain")).toHaveCount(0);
+  }
 });
 
 test("explains Lace's Preprod network mismatch", async ({ page }) => {
