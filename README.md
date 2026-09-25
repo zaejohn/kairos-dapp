@@ -17,7 +17,7 @@ Evidence checked on **25 September 2026** against public `main` commit `f47d891`
 | CI | [Latest `main` run](https://github.com/zaejohn/kairos-dapp/actions/runs/36095923026): quality job passed; browser-test job failed. An [earlier full run](https://github.com/zaejohn/kairos-dapp/actions/runs/36007235585) passed on `6359b53`. **Current-head CI is not green.** |
 | Git history | **49 commits** on public `main` at the audited commit. [Examples of substantive milestones](#commit-history). Judges determine whether commits are meaningful. |
 
-**Submission blockers:** no verified post-deployment circuit call, current-head CI is red, compile/deployment/test screenshots are absent, and the [proposal](PROPOSAL.md) is unfinished with no organizer approval recorded. A product X profile is not linked. The public demo is available for viewing, but a complete Preprod wallet flow has not been independently demonstrated. The [Level 1–5 checklist](#level-by-level-submission-checklist) names the evidence still needed.
+**Submission blockers:** no verified post-deployment circuit call, current-head CI is red, and the [proposal](PROPOSAL.md) is unfinished with no organizer approval recorded. A product X profile is not linked. The public demo is available for viewing, but a complete Preprod wallet flow has not been independently demonstrated. Compile, deployment, and test screenshots are included below; they must be committed with this README before judges can see them on GitHub. The [Level 1–5 checklist](#level-by-level-submission-checklist) names the evidence still needed.
 
 ## Initial product idea
 
@@ -133,10 +133,18 @@ The statuses below apply to this evidence snapshot. **Implemented** means code o
 | Requirement | Evidence / status |
 | --- | --- |
 | Public repository, README, setup, initial idea, public/private explanation | [Public repository](https://github.com/zaejohn/kairos-dapp); sections above. **Verified.** |
-| Toolchain, Compact compile, passing tests | Pinned toolchain and [current-head quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36095923026/job/107948065182). **Verified for that job**; compile/test screenshot still needed. |
+| Toolchain, Compact compile, passing tests | Pinned toolchain, [compile screenshot](docs/evidence/compact-compile.png), [12 passing contract tests](docs/evidence/contract-tests.png), and [current-head quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36095923026/job/107948065182). **Local screenshots captured; CI quality job passed.** |
 | Generated `managed/` circuits and keys | Created by `npm run compact:compile`; present locally, **ignored in Git**. Judges must run the command; confirm organizer expectations if they require the directory in Git. |
-| Preview/Preprod deployment and visible address | Preprod address/hash above; read-only verifier returned `SUCCESS` and eight matching keys. **Verified**; deployment/address screenshot still needed. |
+| Preview/Preprod deployment and visible address | Preprod address/hash above; read-only verifier returned `SUCCESS` and eight matching keys. [Deployment screenshot](docs/evidence/preprod-deployment.png) shows the address and `SUCCESS`. **Verified.** |
 | At least 5 meaningful commits | 49 total commits at audited `main`; [milestone examples](#commit-history). **Count verified; meaning is judge-assessed.** |
+
+**Compile evidence:** Compact compiler 0.31.1 completed one contract, listed all eight circuits, and generated their verifier keys.
+
+![Terminal output showing Kairos Compact compilation and eight circuit names](docs/evidence/compact-compile.png)
+
+**Deployment evidence:** The read-only Preprod verifier reports the deployed address, transaction hash, `SUCCESS` in block 2,686,941, and eight current artifact circuits.
+
+![Terminal output verifying the Kairos Preprod deployment address and successful transaction](docs/evidence/preprod-deployment.png)
 
 ### Level 2
 
@@ -151,10 +159,14 @@ The statuses below apply to this evidence snapshot. **Implemented** means code o
 
 | Requirement | Evidence / status |
 | --- | --- |
-| Functional privacy dApp, at least 3 passing tests | Eight-circuit app and [current-head quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36095923026/job/107948065182) passed compile, contract/app tests, and build. **Local/CI test evidence exists; live circuit remains unverified.** Test-output screenshot pending. |
+| Functional privacy dApp, at least 3 passing tests | Eight-circuit app, [test screenshot](docs/evidence/contract-tests.png) showing **12 passing contract tests**, and [current-head quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36095923026/job/107948065182). **Local/CI test evidence exists; live circuit remains unverified.** |
 | CI workflow with passing runs | [Workflow](.github/workflows/ci.yml) and [earlier full green run](https://github.com/zaejohn/kairos-dapp/actions/runs/36007235585) exist. **Latest `main` run is red**, so current-head passing CI is pending. |
 | Approved idea from provided list / submitted product proposal | [PROPOSAL.md](PROPOSAL.md) still has owner placeholders. Kairos has **no recorded category approval or exception** from the organizer. **Pending.** |
 | Public README/demo/privacy explanation and 10 meaningful commits | Links/sections above; 49 total commits. **Documented; judge assesses meaning and live functionality.** |
+
+**Test evidence:** The local Vitest contract suite completed with 12 passing tests in one test file. This screenshot is test evidence, not a live Preprod circuit receipt.
+
+![Terminal output showing 12 passing Kairos contract tests](docs/evidence/contract-tests.png)
 
 ### Level 4
 
@@ -182,7 +194,7 @@ The public `main` branch had **49 commits** at `f47d891`. Examples that a judge 
 ## Remaining work before submission
 
 1. **Repair current-head CI.** The [latest browser job](https://github.com/zaejohn/kairos-dapp/actions/runs/36095923026/job/107948435271) fails because the app now opens with **Enter the Garage** while the Playwright flow looks for workshop controls immediately. Update the browser tests for the actual entry flow, run `npm run test:e2e`, push the fix, and confirm the newest `main` **quality and e2e jobs both pass**. Only then add a green current-head CI badge.
-2. **Capture three real screenshots.** On your development machine, run `npm run compact:compile` and show its successful output; run `Get-ChildItem contracts/managed/kairos/keys -Filter *.verifier -Name` to show the eight generated circuit names. Run the **exact** `verify:preprod` command above and capture `SUCCESS`, the contract address, and the eight-key match. If the judge wants the address in the app, show **Settings → Local developer controls** in a local development build beside the verifier output; do not expose the password field's contents. Run `npm run verify` and capture **3 or more passing tests**. Save readable, uncropped images under a new `docs/evidence/` directory, commit them, and link each image from this README. Do not include an opening file, password, wallet secret, or private witness.
+2. **Publish the captured screenshots.** The compile, deployment, and 12-test images are embedded under Levels 1 and 3 above. Commit `README.md` and all three files in `docs/evidence/`, push them, and open the public README in a signed-out browser to confirm that each image renders. Keep passwords, opening files, and wallet secrets out of future evidence.
 3. **Prove a real frontend circuit call and record the demo.** Follow [the live verification steps above](#verify-an-actual-frontend-circuit-call) in a funded Preprod Lace browser with both local proof services. Save the finalized public transaction ID, run `verify:activity` against `commitPosition`, and add the result link/receipt to the README. Record a short video showing Lace connection, finalized circuit result, and disconnection; the repository's longer Level 2–3 checklist calls for a demo video. Keep the opening private.
 4. **Finish and submit the proposal.** Replace the placeholders in [PROPOSAL.md](PROPOSAL.md), select a category from the challenge's provided idea list **or obtain an explicit exception for Kairos**, submit it through the organizer's actual channel, and record the approval evidence. This repository contains no approval.
 5. **Link the product X profile.** Create or identify the official Kairos profile, publish only claims supported by the live evidence, and add its exact URL here. There is no verified URL to use today.
