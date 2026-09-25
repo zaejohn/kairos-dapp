@@ -119,6 +119,47 @@ function walletProvider(api: ConnectedAPI, keys: { coin: string; encryption: str
   };
 }
 
+function localStateProvider(wallet: WalletConnection, password: string) {
+  return levelPrivateStateProvider<"kairos", undefined>({
+    accountId: wallet.shieldedAddress,
+    midnightDbName: "kairos-preprod-v1",
+    privateStateStoreName: "private-state",
+    signingKeyStoreName: "signing-keys",
+    privateStoragePasswordProvider: () => password,
+  });
+}
+
+export async function activateLocalStoragePassword(
+  wallet: WalletConnection,
+  contractAddress: string,
+  currentPassword: string,
+  nextPassword: string,
+): Promise<{ existingKeyVerified: boolean }> {
+  validatePassword(nextPassword);
+  if (wallet.networkId !== "preprod") {
+    throw new AppError("WALLET_WRONG_NETWORK", "Connect a Midnight wallet to Preprod before saving a local storage password.");
+  }
+  const provider = localStateProvider(wallet, nextPassword);
+  try {
+    // This contract has no application private state; the provider persists its
+    // local contract signing key. Rotate that encrypted store before switching.
+    if (currentPassword && currentPassword !== nextPassword) {
+      await provider.changeSigningKeysPassword(() => currentPassword, () => nextPassword);
+    }
+    // A first-time deploy has no contract address yet. A wallet-scoped lookup
+    // still checks browser storage without creating or replacing a signing key.
+    const existingKey = await provider.getSigningKey(contractAddress || wallet.shieldedAddress);
+    return { existingKeyVerified: existingKey != null };
+  } catch (cause) {
+    await provider.invalidateEncryptionCache();
+    throw new AppError(
+      "PASSWORD_STORAGE_UNAVAILABLE",
+      "Could not unlock this wallet's encrypted local signing keys. If you used this browser before, enter the previous password first; also check browser storage access. The new password was not activated.",
+      { cause },
+    );
+  }
+}
+
 export async function createMarketClient(wallet: WalletConnection, password: string, onProgress: (progress: TransactionProgress) => void = () => {}) {
   if (typeof window === "undefined") throw new AppError("BROWSER_ONLY", "The market is available only in a browser.");
   try {
@@ -152,13 +193,7 @@ export async function createMarketClient(wallet: WalletConnection, password: str
     midnightProvider: adapter,
   }, onProgress);
   const providers: MidnightProviders<CircuitId, "kairos", undefined> = {
-    privateStateProvider: levelPrivateStateProvider<"kairos", undefined>({
-      accountId: wallet.shieldedAddress,
-      midnightDbName: "kairos-preprod-v1",
-      privateStateStoreName: "private-state",
-      signingKeyStoreName: "signing-keys",
-      privateStoragePasswordProvider: () => password,
-    }),
+    privateStateProvider: localStateProvider(wallet, password),
     publicDataProvider,
     zkConfigProvider,
     ...transactionProviders,

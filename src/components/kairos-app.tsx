@@ -74,7 +74,7 @@ type PositionPreview = Pick<
 > & { receipt?: PublicTxReceipt };
 
 const transactionStageText: Record<TransactionStage, string> = {
-  preparing: "Preparing wallet keys and contract providers…",
+  preparing: "Preparing local contract state and transaction…",
   proving: "Generating a proof with the proof server on this device…",
   balancing: "Balancing in the wallet; approve if prompted…",
   submitting: "Submitting through the wallet…",
@@ -83,7 +83,7 @@ const transactionStageText: Record<TransactionStage, string> = {
 
 const transactionFailureText: Record<TransactionStage, string> = {
   preparing:
-    "Wallet or provider setup failed. Check the local password and wallet connection, then retry.",
+    "Could not prepare the local contract state or transaction. Check the saved password, wallet connection, and current round.",
   proving:
     "Local proving failed. Check the Kairos proof server, browser Local Network Access permission, and circuit inputs.",
   balancing:
@@ -116,7 +116,7 @@ function shortError(error: unknown, fallback: string) {
   )
     return error.message;
   const reason = walletFailureReason(error);
-  if (reason) return `${fallback} Wallet response: ${reason}.`;
+  if (reason) return `${fallback} Details: ${reason}.`;
   return fallback;
 }
 
@@ -167,6 +167,8 @@ export function KairosApp({
   );
   const [password, setPassword] = useState("");
   const [passwordDraft, setPasswordDraft] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<"empty" | "checking" | "ready" | "error">("empty");
+  const [existingKeyVerified, setExistingKeyVerified] = useState(false);
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [side, setSide] = useState<0 | 1>(0);
   const [tradeSide, setTradeSide] = useState<QuoteSide>(0);
@@ -302,6 +304,8 @@ export function KairosApp({
       throw new AppError("PASSWORD_UNSAVED", "Save or clear the password change in Settings before submitting a transaction.");
     if (!password)
       throw new AppError("PASSWORD_REQUIRED", "Enter and save a local storage password in Settings before submitting a transaction.");
+    if (passwordStatus !== "ready")
+      throw new AppError("PASSWORD_UNVERIFIED", "Verify the local storage password in Settings before submitting a transaction.");
     reportTransactionProgress({ stage: "preparing" });
     const { createMarketClient } = await import("@/lib/midnight/market-client");
     return createMarketClient(
@@ -311,9 +315,14 @@ export function KairosApp({
     );
   }
 
-  function saveStoragePassword() {
+  async function saveStoragePassword() {
+    if (!wallet) {
+      showToast("warning", "Connect a Preprod wallet before saving a local storage password.", undefined, false, "storage-password");
+      return;
+    }
+    const candidate = passwordDraft;
     try {
-      validatePassword(passwordDraft);
+      validatePassword(candidate);
     } catch (cause) {
       if (cause instanceof PasswordValidationError) {
         showToast("error", "Enter a stronger local storage password: 16+ characters, three character types, and no simple repeats or sequences.", undefined, false, "storage-password");
@@ -321,9 +330,30 @@ export function KairosApp({
       }
       throw cause;
     }
-    setPassword(passwordDraft);
-    setPasswordDraft("");
-    showToast("success", "Local storage password saved for this browser session.", undefined, false, "storage-password");
+    setBusy("saving-password");
+    setPasswordStatus("checking");
+    try {
+      const { activateLocalStoragePassword } = await import("@/lib/midnight/market-client");
+      const result = await activateLocalStoragePassword(
+        wallet,
+        contractAddress,
+        passwordStatus === "ready" ? password : "",
+        candidate,
+      );
+      setPassword(candidate);
+      setPasswordDraft("");
+      setExistingKeyVerified(result.existingKeyVerified);
+      setPasswordStatus("ready");
+      showToast("success", result.existingKeyVerified
+        ? "Password saved for this tab. This wallet's local signing key was unlocked."
+        : "Password saved for this tab. Local storage is ready for the first transaction.", undefined, false, "storage-password");
+    } catch (cause) {
+      setPasswordStatus("error");
+      setExistingKeyVerified(false);
+      showToast("error", shortError(cause, "Could not verify the local storage password. Retry in Settings."), undefined, false, "storage-password");
+    } finally {
+      setBusy(null);
+    }
   }
 
   function selectWallet(option: WalletOption) {
@@ -443,6 +473,8 @@ export function KairosApp({
     setWalletBalanceStatus("idle");
     setPassword("");
     setPasswordDraft("");
+    setPasswordStatus("empty");
+    setExistingKeyVerified(false);
     setSide(0);
     setTradeSide(0);
     setTradeDirection("buy");
@@ -1510,14 +1542,15 @@ export function KairosApp({
                 type="password"
                 value={passwordDraft}
                 onChange={(event) => setPasswordDraft(event.target.value)}
+                disabled={Boolean(busy)}
                 placeholder={password ? "Enter a new password to update" : "16+ characters, 3 character classes"}
                 autoComplete="new-password"
               />
               <p className="fine-print">
                 Required on this device for Kairos transactions. It encrypts
                 Midnight signing keys in this browser and is never sent to
-                Kairos. Keep it safe; changing it may make existing local keys
-                inaccessible. The saved password lasts until you disconnect or reload.
+                Kairos. Encrypted local keys remain in this browser; the password
+                itself stays only in this tab. Re-enter it after a reload or disconnect.
               </p>
               <div className="action-row">
                 <button
@@ -1526,17 +1559,21 @@ export function KairosApp({
                   disabled={!passwordDraft || Boolean(busy)}
                   onClick={saveStoragePassword}
                 >
-                  {password ? "Update password" : "Save password"}
+                  {busy === "saving-password" ? "Checking local storage…" : passwordStatus === "error" ? "Verify password" : password ? "Update password" : "Save password"}
                 </button>
               </div>
-              <p className="fine-print" role="status">
-                {passwordDraft
-                  ? password
-                    ? "A password is saved; save or clear this change before submitting."
-                    : "Password not saved yet."
-                  : password
-                    ? "Password saved for this browser session."
-                    : "No password saved for this browser session."}
+              <p className={`password-status password-status-${passwordStatus}`} role="status">
+                {passwordStatus === "checking"
+                  ? "Checking this wallet's encrypted local storage…"
+                  : passwordStatus === "error"
+                    ? "Password not verified. Retry with the password used for this wallet in this browser."
+                    : passwordDraft
+                      ? "Unsaved password change. Save or clear it before submitting."
+                      : passwordStatus === "ready"
+                        ? existingKeyVerified
+                          ? "Ready in this tab · Existing local signing key unlocked."
+                          : "Ready in this tab · Local storage accessible; a signing key will be created on first use."
+                        : "No password saved in this tab."}
               </p>
               <div className="action-row">
                 <button

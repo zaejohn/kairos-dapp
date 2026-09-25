@@ -165,6 +165,9 @@ footer { border-top:1px solid #6f5232; display:flex; justify-content:space-betwe
 .trade-preview strong { text-align:right; overflow-wrap:anywhere; }
 .session-receipt,.settings-wallet { margin-top:26px; padding:18px 20px; border:1px solid #b6976c; background:#f6e7ca; overflow-wrap:anywhere; }
 .session-receipt p { margin-bottom:0; }
+.password-status { margin:12px 0 20px; padding:10px 13px; border:1px solid #aa8a61; background:#f8ecd4; color:#4f3a23; font-size:12px; font-weight:700; line-height:1.5; }
+.password-status-ready { border-color:#648456; background:#e6f0dc; color:#284527; }
+.password-status-error { border-color:#a85d51; background:#f9e7e1; color:#753326; }
 .developer-settings summary { cursor:pointer; font-weight:800; }
 .position-vault { margin-top:24px; padding:17px 20px; border:1px solid #a8865c; background:#f8ecd4; }
 .position-vault summary { cursor:pointer; font-weight:800; }
