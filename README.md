@@ -11,6 +11,7 @@ Evidence snapshot: **25 September 2026**, public `main` commit `9e80ea5`. Finali
 | Public source               | [GitHub repository](https://github.com/zaejohn/kairos-dapp) · [commit history](https://github.com/zaejohn/kairos-dapp/commits/main)                                                                                                                                              |
 | Public demo                 | [kairos-dapp.vercel.app](https://kairos-dapp.vercel.app) — homepage, health route, robots file, sitemap, and one proving asset were accessible without sign-in at this audit.                                                                         |
 | Demo video                 | [Kairos demo recording](https://drive.google.com/file/d/1-Tv1BLNPHblSF-TebN8ALZhJ1BJGgMad/view?usp=sharing) (Google Drive; link supplied by the project owner).                                                                                  |
+| X profile                  | [X Profile](https://x.com/kong002) (link supplied by the project owner). |
 | Midnight network            | **Preprod only**                                                                                                                                                                                                                                                                 |
 | Contract address            | `ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f`                                                                                                                                                                                                               |
 | Deployment transaction hash | `ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc`                                                                                                                                                                                                               |
@@ -174,7 +175,7 @@ The statuses below apply to this evidence snapshot. **Implemented** identifies c
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Level 3 eligibility and working Preprod MVP | Public app and deployed contract are verified. Next evidence: finalized circuit and economic transactions, plus idea approval.                           |
 | Full documentation, live link, CI           | This README, [usage](docs/USAGE.md), [Vercel guide](docs/DEPLOY_VERCEL.md), and public demo exist. Next evidence: updated browser CI run.                 |
-| Product X profile                           | Add the official product profile URL after the owner creates or identifies it.                                                                            |
+| Product X profile                           | [X Profile](https://x.com/kong002) (link supplied by the project owner). |
 | At least 15 meaningful commits              | 54 total at audited public `main`; [history](#commit-history). **Count verified; significance requires review.**                                        |
 
 ### Level 5
@@ -197,7 +198,7 @@ The public `main` branch had **54 commits** at `9e80ea5`. Examples: [Compact con
 2. **Review the evidence images.** The three images in `docs/evidence/` are tracked in Git. Confirm they render in the public README from a signed-out browser. Keep passwords, opening files, and wallet secrets private.
 3. **Link a verified circuit receipt.** Follow [the live verification steps](#verify-an-actual-frontend-circuit-call), run `verify:activity` against `commitPosition`, and add the finalized transaction link. Review the [owner-provided recording](https://drive.google.com/file/d/1-Tv1BLNPHblSF-TebN8ALZhJ1BJGgMad/view?usp=sharing) for the wallet connection, finalized result, and disconnect sequence.
 4. **Submit the proposal.** Complete [PROPOSAL.md](PROPOSAL.md), select a category from the challenge's idea list or obtain an explicit exception, and record the submission and approval evidence.
-5. **Add the product X profile.** Create or identify the official Kairos profile and link its exact URL here.
+5. **Confirm public profile access.** Open the X Profile link above in a signed-out browser and confirm it is viewable.
 6. **Collect Level 5 user evidence.** With consent, verify finalized Preprod interactions and wallet control, distinguish repeat activity from distinct participants, and update [USERS.md](USERS.md) and [docs/FEEDBACK.md](docs/FEEDBACK.md) with real feedback and linked improvements.
 7. **Publish the updated README.** Review the links, commit and push the documentation, then reopen the public README and demo in a signed-out browser.
 
