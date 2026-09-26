@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-09-26T07:25:01.655Z",
+  "contractAddress": "ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f",
+  "network": "preprod",
+  "deployment": {
+    "transactionHash": "ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc",
+    "block": 2686941,
+    "status": "SUCCESS",
+    "matchingVerifierKeys": 8,
+    "verificationCommand": "npm run verify:preprod -- ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc"
+  },
+  "publicState": {
+    "round": "1",
+    "phase": "1",
+    "nextIndex": "8",
+    "roundCloseAt": "1790844103",
+    "economyIssued": true,
+    "reserveA": "9075",
+    "reserveB": "6975",
+    "feePool": "505",
+    "kaiDistributed": "505",
+    "treasuryActionCount": "0"
+  },
+  "circuitReceipts": [],
+  "activityBoundary": "Current public state corroborates commitments, issuance and trading; no individual circuit transaction hashes or CSV-user attribution established by this snapshot.",
+  "demo": {
+    "origin": "https://kairos-dapp.vercel.app",
+    "checks": [
+      {
+        "path": "/",
+        "status": 200
+      },
+      {
+        "path": "/api/health",
+        "status": 200
+      },
+      {
+        "path": "/robots.txt",
+        "status": 200
+      },
+      {
+        "path": "/sitemap.xml",
+        "status": 200
+      },
+      {
+        "path": "/zk/kairos/keys/commitPosition.verifier",
+        "status": 200
+      }
+    ],
+    "configuredContractPresentInHtml": true
+  },
+  "ci": {
+    "id": 36223626837,
+    "url": "https://github.com/zaejohn/kairos-dapp/actions/runs/36223626837",
+    "headSha": "d5bd45afcfac5e696e556722d198089b7ac389f8",
+    "status": "completed",
+    "conclusion": "success",
+    "updatedAt": "2026-09-26T06:29:05Z"
+  }
+}

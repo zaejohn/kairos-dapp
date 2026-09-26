@@ -27,7 +27,7 @@ The `.env.example` and README contain the verified address and hash. Production 
    | `NEXT_PUBLIC_MIDNIGHT_NETWORK` | `preprod` | Browser-visible; required for every environment |
    | `NEXT_PUBLIC_KAIROS_CONTRACT_ADDRESS` | `ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f` | Browser-visible public identifier |
    | `KAIROS_DEPLOYMENT_TX_ID` | `ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc` | Build-time public transaction hash |
-   | `KAIROS_SITE_URL` | `https://<your production domain>` with no path or trailing content | Server/build metadata |
+   | `KAIROS_SITE_URL` | `https://kairos-dapp.vercel.app` (current public deployment) | Server/build metadata |
 
 3. For **Preview**, set only `NEXT_PUBLIC_MIDNIGHT_NETWORK=preprod`. Preview builds can render without an address for UI review and are marked `noindex`; they are not a live market until a valid address is supplied. Do not put seeds, private openings, local storage passwords, or API keys in Vercel variables. `MIDNIGHT_PROOF_SERVER_URL` is only for local scripts and is **not** a Vercel server setting.
 4. Configure the production domain in **Project Settings → Domains**. Use that exact HTTPS origin for `KAIROS_SITE_URL`. In **Project Settings → Deployment Protection**, choose **None** or **Standard Protection**, which leaves production domains public; do not choose **All Deployments** or a production-only restriction. A protected production domain cannot be publicly used or indexed.

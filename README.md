@@ -1,10 +1,12 @@
-# Kairos
+# KAIROS
+
+[![CI](https://github.com/zaejohn/kairos-dapp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zaejohn/kairos-dapp/actions/workflows/ci.yml)
 
 **Private market conviction, public treasury rules, on Midnight Preprod.** Kairos is a quote-side signal market and contract-custodied trading prototype. Participants commit to a side without publishing it; a trusted resolver later proves the complete eight-position tally. The result sets a public treasury reserve target. Quote trades and treasury accounting are public.
 
 ## Quick links and current status
 
-Evidence snapshot: **25 September 2026**, public `main` commit `9e80ea5`. Finalized transaction receipts provide the evidence for live circuit activity.
+Evidence snapshot: **26 September 2026**. Latest published `main` CI: **`d5bd45a`, success**. Local changes and live state are reported separately in the [requirement audit](docs/challenge/LEVELS_4_6_AUDIT.md).
 
 | Item                        | Link or observation                                                                                                                                                                                                                                                    |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -16,8 +18,16 @@ Evidence snapshot: **25 September 2026**, public `main` commit `9e80ea5`. Finali
 | Contract address            | `ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f`                                                                                                                                                                                                     |
 | Deployment transaction hash | `ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc`                                                                                                                                                                                                     |
 | Deployment verification     | Read-only [verifier](scripts/midnight/verify-preprod-deployment.mjs) returned `SUCCESS` in block **2,686,941** and matched all **eight** deployed verifier keys to this build. [Recheck it](#verify-the-contract-and-submission-evidence).                             |
-| CI                          | [Latest `main` run](https://github.com/zaejohn/kairos-dapp/actions/runs/36109085089): quality job passed; browser tests identified an intro-flow mismatch. An [earlier full run](https://github.com/zaejohn/kairos-dapp/actions/runs/36007235585) passed on `6359b53`. |
-| Git history                 | **54 commits** on public `main` at the audited commit. [Examples of substantive milestones](#commit-history); commit significance is reviewed individually.                                                                                                            |
+| CI | [Latest successful main run](https://github.com/zaejohn/kairos-dapp/actions/runs/36223626837): quality and browser jobs passed at `d5bd45a`. The badge tracks published `main`, not unpublished local edits. |
+| Git history | **61 commits** at audited published `main` (`d5bd45a`); [substantive milestone examples](#commit-history). |
+
+## Contract Address
+
+| Network | Address |
+|---------|---------|
+| Preprod | `ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f` |
+
+The Compact source is unchanged by this audit; no redeployment is required.
 
 ## Initial product idea
 
@@ -30,9 +40,13 @@ Kairos lets participants express a private weekly view on one of two quote sides
 3. Resolution or expiry applies the target to **internal** NIGHT redemption reserves. A separate call can restore the target after later trades; the next round starts only when the reserve split matches its target.
 4. A one-time issuance circuit and public NIGHT/quote buy and sell circuits implement the contract-custodied token economy, fees, and bounded KAI trade incentive. Treasury actions append public accounting records.
 
-The contract has compiled and local accounting/proving checks have passed. The deployment is independently verified; post-deployment circuit activity is a separate verification step. Public state reported `economyIssued: false` at this audit. Economic scope is contract-custodied trading and internal reserve accounting, with redemption limited by each side's available reserve. See [usage](docs/USAGE.md) and [capability boundaries](docs/research/PRODUCT_CAPABILITIES.md).
+The contract has compiled and local accounting/proving checks have passed. The deployment is independently verified; post-deployment circuit activity is a separate verification step. Fresh public state reports `economyIssued: true`, eight commitments in round 1, and nonzero reserves and trading fees. Individual circuit transaction hashes and the complete round-resolution flow remain unverified. Economic scope is contract-custodied trading and internal reserve accounting, with redemption limited by each side's available reserve. See [usage](docs/USAGE.md) and [capability boundaries](docs/research/PRODUCT_CAPABILITIES.md).
 
-## Privacy model: public state vs private witness
+## Privacy Model — PUBLIC / PRIVATE / PROVEN
+
+- **PUBLIC:** indexed commitment hashes, round timing, winner, reserve targets, token economy and trades.
+- **PRIVATE:** individual side and salt stay off the public ledger; the participant, trusted resolver and their proof server can see the opening.
+- **PROVEN:** commitments and all eight resolution openings satisfy the contract rules; the winner and reserve accounting follow the verified tally.
 
 | Data                                                                  | Who can learn it?                                            | What the circuit establishes                                                                            |
 | --------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
@@ -43,6 +57,10 @@ The contract has compiled and local accounting/proving checks have passed. The d
 | Trade side, amount, fee, and unshielded recipient                     | Anyone reading the public transaction                        | Trades are public.                                                                                      |
 
 An on-chain observer sees each commitment's hash, index, and timing. The side and salt stay off the public ledger; resolution publishes the winner. This is **ledger privacy**. The resolver, its proof server, the participant's device, and recipients of an opening can learn the side. Timing and a small cohort can permit inference, and one wallet can submit several commitments. Keep opening files, local storage passwords, and wallet secrets private. See [the full privacy model](docs/product/PRIVACY_MODEL.md).
+
+## Tech Stack
+
+Next.js **16.3.6**, React **19.3.0**, TypeScript **6.0.3**, Compact compiler **0.31.1** / runtime **0.16.0**, Midnight.js **4.1.1**, Connector API **4.0.1**, ledger/proof server **8.1.0**, Midnight Lace, Vitest and Playwright. Exact pins: [package.json](package.json) and [version matrix](docs/midnight/VERSIONS.md).
 
 ## Run locally
 
@@ -94,7 +112,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm run verify` compiles, runs contract and application tests, lint and typecheck, and builds the app. Its steps passed in the [latest quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36109085089/job/107988196838). The [browser job](https://github.com/zaejohn/kairos-dapp/actions/runs/36109085089/job/107988814967) records an intro-flow test mismatch: seven cases expect the workshop before **Enter the Garage**. Update the browser flow and confirm a passing run before adding a current-head CI badge. The [CI workflow](.github/workflows/ci.yml) and [test screenshot](docs/evidence/contract-tests.png) provide separate evidence.
+`npm run verify` compiles, runs contract and application tests, lint and typecheck, validates the public evidence tables, and builds the app. The [latest published CI run](https://github.com/zaejohn/kairos-dapp/actions/runs/36223626837) passed both quality and browser jobs; the earlier intro-flow mismatch has been resolved. See the [CI workflow](.github/workflows/ci.yml), [test screenshot](docs/evidence/contract-tests.png), and [current local checks](docs/challenge/LEVELS_4_6_AUDIT.md).
 
 The local `npm run proof:smoke` command checks and proves eight circuits with inputs against the local proof server. Use finalized Preprod receipts for wallet and network verification.
 
@@ -106,12 +124,12 @@ With generated artifacts present, run this **read-only** command:
 npm run verify:preprod -- ed9154cae3c2f2e40e077002ae41dc59b2d4f7052d5224bb99d3ccecbfd3965f ef335e98a0e96f5ee07563a89465a20acad0bcedb9adf8518cb533ff4bb2f6cc
 ```
 
-It queries the [Midnight Preprod indexer](https://indexer.preprod.midnight.network/api/v4/graphql), checks that the transaction deployed this exact address with final `SUCCESS`, and compares all eight deployed verifier keys with the local build. At this audit it returned block **2,686,941**, round **1**, phase **0**, and `economyIssued: false`. Current round and economy fields can change after future transactions.
+It queries the [Midnight Preprod indexer](https://indexer.preprod.midnight.network/api/v4/graphql), checks that the transaction deployed this exact address with final `SUCCESS`, and compares all eight deployed verifier keys with the local build. The deployment finalized in block **2,686,941**. The fresh state snapshot is round **1**, phase **1** (full), and `economyIssued: true`. Current round and economy fields can change after future transactions.
 
 ### Verify an actual frontend circuit call
 
 1. On the [public demo](https://kairos-dapp.vercel.app) in the browser profile with Preprod Lace, select **Enter the Garage**, then **Wallet** and connect Lace. In **Settings**, enter and **save** the local storage password, then confirm the local proof server. The wallet should show Preprod and the connected addresses/balance.
-2. Open **Trading Engine** before the round close. Choose a side, prepare and download its opening file, acknowledge that it is saved, then submit the commitment and approve the wallet request. Keep the opening private.
+2. Open **Trading Engine** in a round with space before its close. The audited round is full; coordinate the next round with the resolver. Choose a side, prepare and download its opening file, acknowledge that it is saved, then submit the commitment and approve the wallet request. Keep the opening private.
 3. Wait for a **finalized** receipt. Record its public transaction hash or identifier and refresh public state.
 4. From the repository root, run:
 
@@ -123,83 +141,45 @@ It queries the [Midnight Preprod indexer](https://indexer.preprod.midnight.netwo
 
 5. To demonstrate a complete round, obtain eight openings in public index order through a private channel, resolve within the one-day window after close, and verify the `resolveRound` transaction and new public target. For the economic extension, verify `initializeEconomy`, `buyQuote`/`sellQuote`, and `rebalanceTreasury` **separately** with their own finalized receipts and public-state changes. See [the detailed usage guide](docs/USAGE.md).
 
-This evidence snapshot links the finalized deployment. Add each independently verified post-deployment circuit receipt as it becomes available.
+The [evidence audit](docs/challenge/LEVELS_4_6_AUDIT.md) records the finalized deployment and fresh public state. Add independently verified circuit receipts as they become available; public state does not identify the tester or originating frontend.
 
-## Level-by-level submission checklist
+## CI/CD
 
-The statuses below apply to this evidence snapshot. **Implemented** identifies code or local checks; **verified** identifies the linked evidence for a specific result. Level completion follows verification of every requirement.
+[CI](.github/workflows/ci.yml) runs on pushes to main and pull requests: pinned Compact compile → contract tests → lint/typecheck/application and evidence tests → production build → Chromium flows. [Vercel](docs/DEPLOY_VERCEL.md) separately compiles artifacts, verifies the configured Preprod deployment, and builds the frontend. CI does not deploy a contract or establish wallet activity.
 
-### Level 1
+## Level 5 — User Validation
 
-| Requirement                                                                | Evidence / status                                                                                                                                                                                                                                                                                      |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Public repository, README, setup, initial idea, public/private explanation | [Public repository](https://github.com/zaejohn/kairos-dapp); sections above. **Verified.**                                                                                                                                                                                                             |
-| Toolchain, Compact compile, passing tests                                  | Pinned toolchain, [compile screenshot](docs/evidence/compact-compile.png), [12 passing contract tests](docs/evidence/contract-tests.png), and [latest quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36109085089/job/107988196838). **Screenshots captured; CI quality job passed.** |
-| Generated `managed/` circuits and keys                                     | Created by `npm run compact:compile`; present locally and **ignored in Git**. Confirm whether reproducible generation meets the submission format.                                                                                                                                                     |
-| Preview/Preprod deployment and visible address                             | Preprod address/hash above; read-only verifier returned `SUCCESS` and eight matching keys. [Deployment screenshot](docs/evidence/preprod-deployment.png) shows the address and `SUCCESS`. **Verified.**                                                                                                |
-| At least 5 meaningful commits                                              | 54 total commits at audited public `main`; [milestone examples](#commit-history). **Count verified; significance requires review.**                                                                                                                                                                    |
+- Target: 50 Preprod users
+- Current: **50 / 50** real tester submissions, exactly CSV rows **2–51**
+- See [USERS.md](USERS.md) for validated Preprod unshielded addresses and dates
+- See [docs/FEEDBACK.md](docs/FEEDBACK.md) for 49 nonblank comments, one preserved blank, and two feedback-backed improvements
 
-**Compile evidence:** Compact compiler 0.31.1 completed one contract, listed all eight circuits, and generated their verifier keys.
+## Level 6 — Additional User Evidence
 
-![Terminal output showing Kairos Compact compilation and eight circuit names](docs/evidence/compact-compile.png)
+- Target: 20 additional users in the requested Preprod roster
+- Current: **22 / 20**, exactly CSV rows **52–73**, with no overlap with Level 5
+- See [LAUNCH_USERS.md](LAUNCH_USERS.md), [feedback and iterations](docs/FEEDBACK.md#level-6-improvements), [brand brief](docs/BRAND.md), [onboarding](docs/ONBOARDING.md), and [demo checklist](docs/DEMO_CHECKLIST.md)
 
-**Deployment evidence:** The read-only Preprod verifier reports the deployed address, transaction hash, `SUCCESS` in block 2,686,941, and eight current artifact circuits.
+The owner confirms all CSV entries are real testers. All 72 addresses pass the pinned Midnight SDK checksum/network/type checks; dates and row alignment are validated. The CSV has no transaction IDs or signed wallet-control attestations. The public [sanitized evidence](docs/evidence/user-feedback.json) omits names/emails and preserves source rows and exact comments.
 
-![Terminal output verifying the Kairos Preprod deployment address and successful transaction](docs/evidence/preprod-deployment.png)
+**Official Level 6 remains incomplete:** Rise In requires a Mainnet launch and users onboarded after launch. These 22 entries are Preprod testers; no Mainnet deployment or post-launch Mainnet cohort is claimed. See the [official program overview](https://www.risein.com/blog/new-moon-to-full-rise-in-and-midnight-introduce-a-builder-path-for-privacy-first-dapps) and [requirement-by-requirement audit](docs/challenge/LEVELS_4_6_AUDIT.md).
 
-### Level 2
+## Usage, Feedback and Submission
 
-| Requirement                                                      | Evidence / status                                                                                                                                                                               |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lace connect/disconnect                                          | [Wallet implementation](src/lib/midnight/wallet.ts) and [frontend](src/components/kairos-app.tsx) exist; owner reported successful connection. Next evidence: recorded approval and disconnect. |
-| Successful frontend circuit call and observable privacy behavior | Commitment/resolution circuits and local tests exist; public witness boundary is explained above. Next evidence: a finalized Preprod `commitPosition` call.                                     |
-| Preprod contract, public demo, privacy claim                     | Verified deployment above; [public demo](https://kairos-dapp.vercel.app) loads without sign-in; privacy section above. Live wallet activity has a separate verification step.                   |
-| At least 8 meaningful commits                                    | 54 total; [history](#commit-history). **Count verified; significance requires review.**                                                                                                         |
+Use the [usage guide](docs/USAGE.md) for wallet setup, the first transaction, verification and troubleshooting. Feedback about delays led to optional startup recovery and public-state loading/retry controls; [the feedback log](docs/FEEDBACK.md) maps the exact comments to changes. These local improvements require publication before the hosted demo includes them.
 
-### Level 3
+[Product proposal](PROPOSAL.md) · [Product X profile](https://x.com/usekairosdApp) · [launch/outreach drafts](docs/OUTREACH.md) · [full requirement audit and remaining actions](docs/challenge/LEVELS_4_6_AUDIT.md). Organizer proposal/category approval and public X posts remain owner-supplied evidence.
 
-| Requirement                                                      | Evidence / status                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Functional privacy dApp, at least 3 passing tests                | Eight-circuit app, [test screenshot](docs/evidence/contract-tests.png) showing **12 passing contract tests**, and [latest quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36109085089/job/107988196838). Live circuit verification follows the steps above. |
-| CI workflow with passing runs                                    | [Workflow](.github/workflows/ci.yml) and [earlier full passing run](https://github.com/zaejohn/kairos-dapp/actions/runs/36007235585). Next evidence: a passing run for the updated browser flow.                                                                             |
-| Approved idea from provided list / submitted product proposal    | [PROPOSAL.md](PROPOSAL.md) has owner fields to complete; add the submission and approval record when received.                                                                                                                                                               |
-| Public README/demo/privacy explanation and 10 meaningful commits | Links and sections above, including the [demo recording](https://drive.google.com/file/d/1-Tv1BLNPHblSF-TebN8ALZhJ1BJGgMad/view?usp=sharing); 54 total commits at the audited public `main`. Commit significance and live functionality are reviewed against evidence.       |
+## Commit History
 
-**Test evidence:** The local Vitest contract suite completed with 12 passing tests in one test file. Live Preprod activity uses separate transaction receipts.
+Published main had **61 commits** at `d5bd45a`. Examples: [Compact contract](https://github.com/zaejohn/kairos-dapp/commit/7f5aee6), [contract tests](https://github.com/zaejohn/kairos-dapp/commit/db65b55), [wallet integration](https://github.com/zaejohn/kairos-dapp/commit/5e47e8c), [CI pipeline](https://github.com/zaejohn/kairos-dapp/commit/bff003e), [private signal market](https://github.com/zaejohn/kairos-dapp/commit/7315e2c), [quote economy](https://github.com/zaejohn/kairos-dapp/commit/905e685), and [deployment verification](https://github.com/zaejohn/kairos-dapp/commit/03e005b). Meaningful milestones are reviewed individually; total count alone is not proof of significance.
 
-![Terminal output showing 12 passing Kairos contract tests](docs/evidence/contract-tests.png)
+<details>
+<summary>Existing compile, contract-test and deployment screenshots</summary>
 
-### Level 4
+![Compact compilation](docs/evidence/compact-compile.png)
+![Twelve contract tests](docs/evidence/contract-tests.png)
+![Preprod deployment verification](docs/evidence/preprod-deployment.png)
 
-| Requirement                                 | Evidence / status                                                                                                                         |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Level 3 eligibility and working Preprod MVP | Public app and deployed contract are verified. Next evidence: finalized circuit and economic transactions, plus idea approval.            |
-| Full documentation, live link, CI           | This README, [usage](docs/USAGE.md), [Vercel guide](docs/DEPLOY_VERCEL.md), and public demo exist. Next evidence: updated browser CI run. |
-| Product X profile                           | [X Profile](https://x.com/usekairosdApp)                                                                                                  |
-| At least 15 meaningful commits              | 54 total at audited public `main`; [history](#commit-history). **Count verified; significance requires review.**                          |
-
-### Level 5
-
-| Requirement                         | Evidence / status                                                                                                                                                                                                                 |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Same Level 4 MVP, extended          | Token economy, trading, reserve restoration, and treasury history are implemented and locally checked. Record their finalized Preprod calls for live verification.                                                                |
-| Updated documentation and live demo | This README, [public demo](https://kairos-dapp.vercel.app), and [demo recording](https://drive.google.com/file/d/1-Tv1BLNPHblSF-TebN8ALZhJ1BJGgMad/view?usp=sharing) are linked. Add independently verified transaction receipts. |
-| At least 20 meaningful commits      | 54 total at audited public `main`; [history](#commit-history). **Count verified; significance requires review.**                                                                                                                  |
-
-The [challenge brief](docs/challenge/LEVELS_1_5.md) also calls for user activity and feedback evidence. [USERS.md](USERS.md) currently records **0/50 verified wallet interactions**; [docs/FEEDBACK.md](docs/FEEDBACK.md) has the feedback record. Verify participants and responses individually before updating those counts.
-
-## Commit history
-
-The public `main` branch had **54 commits** at `9e80ea5`. Examples: [Compact contract](https://github.com/zaejohn/kairos-dapp/commit/7f5aee6), [contract tests](https://github.com/zaejohn/kairos-dapp/commit/db65b55), [wallet integration](https://github.com/zaejohn/kairos-dapp/commit/5e47e8c), [CI pipeline](https://github.com/zaejohn/kairos-dapp/commit/bff003e), [private signal market](https://github.com/zaejohn/kairos-dapp/commit/7315e2c), [quote economy](https://github.com/zaejohn/kairos-dapp/commit/905e685), and [Preprod deployment verification](https://github.com/zaejohn/kairos-dapp/commit/03e005b). The total includes scaffolding and maintenance; commit significance is reviewed individually.
-
-## Next submission steps
-
-1. **Confirm updated CI.** Update the browser tests for **Enter the Garage**, run `npm run test:e2e`, push the change, and confirm that the newest `main` quality and browser jobs both pass. Add a current-head CI badge after that run.
-2. **Review the evidence images.** The three images in `docs/evidence/` are tracked in Git. Confirm they render in the public README from a signed-out browser. Keep passwords, opening files, and wallet secrets private.
-3. **Link a verified circuit receipt.** Follow [the live verification steps](#verify-an-actual-frontend-circuit-call), run `verify:activity` against `commitPosition`, and add the finalized transaction link. Review the [owner-provided recording](https://drive.google.com/file/d/1-Tv1BLNPHblSF-TebN8ALZhJ1BJGgMad/view?usp=sharing) for the wallet connection, finalized result, and disconnect sequence.
-4. **Submit the proposal.** Complete [PROPOSAL.md](PROPOSAL.md), select a category from the challenge's idea list or obtain an explicit exception, and record the submission and approval evidence.
-5. **Confirm public profile access.** Open the X Profile link above in a signed-out browser and confirm it is viewable.
-6. **Collect Level 5 user evidence.** With consent, verify finalized Preprod interactions and wallet control, distinguish repeat activity from distinct participants, and update [USERS.md](USERS.md) and [docs/FEEDBACK.md](docs/FEEDBACK.md) with real feedback and linked improvements.
-7. **Publish the updated README.** Review the links, commit and push the documentation, then reopen the public README and demo in a signed-out browser.
-
-For deployment changes or a replacement contract, follow [DEPLOY_VERCEL.md](docs/DEPLOY_VERCEL.md) and pair each address with its finalized deployment and matching verifier keys.
+These are earlier captured evidence; dated current results are in the audit.
+</details>

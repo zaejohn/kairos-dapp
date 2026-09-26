@@ -1,5 +1,17 @@
 # Long-Running State
 
+## Current milestone — 2026-09-26
+
+- **Goal:** Judge-verifiable Levels 4–6 evidence and feedback-backed improvements.
+- **Decision:** Keep the existing eight-circuit Preprod deployment; the contract source is unchanged. Preserve supplied real testers as exact CSV cohorts: Level 5 rows 2–51 (50), additional Preprod rows 52–73 (22). Publish no names/emails.
+- **Verified:** All 72 wallet addresses decode as canonical Preprod unshielded addresses; valid dates, zero duplicates, 71 comments. Current published main CI `36223626837` at `d5bd45a` is successful. Demo and four supporting endpoints return HTTP 200. Fresh deployment verification matches all eight keys; current state has eight commitments and economy issued.
+- **Improvements:** Optional entry after eight seconds of stalled artwork; visible public-market read status and direct retry. Existing Garage design and transaction authority preserved.
+- **Last green checks:** Compact 0.31.1, 12 contract tests, 36 application tests, 15 Node tests, 11 Playwright flows, lint, typecheck and production build.
+- **Remaining:** Publish local changes, organizer approval, signed-out X/posts/video verification and individual circuit receipts. Official Level 6 requires Mainnet and users after launch; this Preprod cohort cannot establish either. See [the current requirement audit](../challenge/LEVELS_4_6_AUDIT.md).
+- **Next:** Owner reviews/publishes the evidence and follows the exact manual actions in that audit. No push, contract deployment, wallet signing or social posting performed.
+
+## Historical milestones — superseded where the current audit differs
+
 - **Goal:** One cumulative Kairos Midnight Preprod product for Levels 1–5.
 - **UI milestone:** Inspected all seven images in `public/reference`; `home-image.png` and `kairos-workshop.png` are Kairos-specific, and the other five former-product screens are mapped in `docs/research/FORMER_PRODUCT_MAPPING.md`. The workshop has desktop/mobile station navigation, public snapshot cards, a trade preview, wallet address copy and local session disconnect, on-demand wallet-reported unshielded balances, a local opening-file preview, locally saved public commitment receipts, and the ten newest on-chain treasury action records. No staking, price chart, or balance is fabricated. The balance path is mocked in browser tests and still needs a live compatible wallet check.
 - **Decision:** One contract contains the eight-position private signal market, public seven-day round deadlines with a one-day resolution window and missed-round expiry, fixed three-token genesis, public NIGHT/quote routes with asymmetric fees and bounded KAI incentives. Resolution or expiry atomically reapportions internal NIGHT reserves; a separate repair call handles later trades, and each action records public post-action state. A new round requires the current reserve split to match the target. It has no authenticated staking/reward withdrawal, autonomous submission, or external liquidity venue; see `docs/research/PRODUCT_CAPABILITIES.md`.

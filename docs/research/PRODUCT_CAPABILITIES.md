@@ -1,5 +1,11 @@
 # Kairos capability and limitation record
 
+## Current evidence — 2026-09-26
+
+The [current audit](../challenge/LEVELS_4_6_AUDIT.md) supersedes the historical live-verification statements below. Fresh deployment verification matches all eight verifier keys from the current compile. Public Preprod state now has economy issued, eight commitments and nonzero trading reserves/fees; individual circuit transaction hashes and resolver/treasury-action receipts remain unrecorded. The live demo is `https://kairos-dapp.vercel.app`; published main CI is successful at `d5bd45a`. No new privacy or economic capability is inferred beyond those observations.
+
+## Historical implementation and research record
+
 Research checked on 2026-09-24 against the [Midnight compatibility matrix](https://docs.midnight.network/relnotes/support-matrix): Compact compiler 0.31.1/language 0.23, runtime 0.16.0, Midnight.js 4.1.1, DApp Connector API 4.0.1, proof server 8.1.0. Source and local compiler/tests are evidence for the design; no Preprod transaction has been observed in this checkout.
 
 ## Implemented boundary

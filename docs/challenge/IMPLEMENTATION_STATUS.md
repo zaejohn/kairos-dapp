@@ -1,5 +1,11 @@
 # Kairos Levels 1–5 evidence status
 
+## Current status — 2026-09-26
+
+The [Levels 4–6 requirement audit](LEVELS_4_6_AUDIT.md) supersedes the historical snapshot below. Latest published main CI is green at `d5bd45a`; live demo endpoints return HTTP 200; deployment verification matches eight current compiled keys. The authoritative CSV provides 50 Level 5 real testers and 22 additional real Preprod testers with validated distinct addresses and 71 nonblank comments. Two feedback-backed loading improvements pass local checks. Public state shows eight commitments, issued economy and trading balances. Organizer approval, public X/video review, circuit receipt links and official Level 6 Mainnet/post-launch user evidence remain separate requirements.
+
+## Historical snapshot — 2026-09-24
+
 Checked on 2026-09-24. This records requirements from `LEVELS_1_5.md`; local checks are distinct from Preprod and public submission evidence.
 
 | Level | Evidence established | Still required for challenge completion |
