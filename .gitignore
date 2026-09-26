@@ -14,7 +14,10 @@
 .env
 .env.local
 .env.*.local
+.env.qa
 !.env.example
+/docs/infos/*.txt
+/qa-state/
 
 # OS/editor
 .DS_Store

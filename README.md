@@ -96,7 +96,7 @@ npm run test:e2e
 
 `npm run verify` compiles, runs contract and application tests, lint and typecheck, and builds the app. Its steps passed in the [latest quality job](https://github.com/zaejohn/kairos-dapp/actions/runs/36109085089/job/107988196838). The [browser job](https://github.com/zaejohn/kairos-dapp/actions/runs/36109085089/job/107988814967) records an intro-flow test mismatch: seven cases expect the workshop before **Enter the Garage**. Update the browser flow and confirm a passing run before adding a current-head CI badge. The [CI workflow](.github/workflows/ci.yml) and [test screenshot](docs/evidence/contract-tests.png) provide separate evidence.
 
-The local `npm run proof:smoke` command checks and proves eight circuits with synthetic inputs against the local proof server. Use finalized Preprod receipts for wallet and network verification.
+The local `npm run proof:smoke` command checks and proves eight circuits with inputs against the local proof server. Use finalized Preprod receipts for wallet and network verification.
 
 ### Verify the finalized deployment
 
