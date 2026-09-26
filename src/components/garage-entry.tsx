@@ -10,6 +10,7 @@ export function GarageEntry({ initialContractAddress }: { initialContractAddress
   const [logoFailed, setLogoFailed] = useState(false);
   const [garageArtworkLoaded, setGarageArtworkLoaded] = useState(false);
   const [revealElapsed, setRevealElapsed] = useState(false);
+  const [loadingWaitElapsed, setLoadingWaitElapsed] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
   const [showGarage, setShowGarage] = useState(false);
   const [entryComplete, setEntryComplete] = useState(false);
@@ -17,6 +18,7 @@ export function GarageEntry({ initialContractAddress }: { initialContractAddress
   const buttonRef = useRef<HTMLButtonElement>(null);
   const garageRef = useRef<HTMLDivElement>(null);
   const ready = logoLoaded && garageArtworkLoaded && revealElapsed;
+  const canEnterWhileLoading = !ready && loadingWaitElapsed;
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +39,12 @@ export function GarageEntry({ initialContractAddress }: { initialContractAddress
   }, [reducedMotion]);
 
   useEffect(() => {
+    if (ready) return;
+    const timer = window.setTimeout(() => setLoadingWaitElapsed(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [ready]);
+
+  useEffect(() => {
     if (entryComplete) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -46,8 +54,8 @@ export function GarageEntry({ initialContractAddress }: { initialContractAddress
   }, [entryComplete]);
 
   useEffect(() => {
-    if (ready && showIntro) buttonRef.current?.focus();
-  }, [ready, showIntro]);
+    if ((ready || canEnterWhileLoading) && showIntro) buttonRef.current?.focus();
+  }, [canEnterWhileLoading, ready, showIntro]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -141,7 +149,7 @@ export function GarageEntry({ initialContractAddress }: { initialContractAddress
 
               <div className="garage-intro-action">
                 <AnimatePresence>
-                  {ready && (
+                  {(ready || canEnterWhileLoading) && (
                     <motion.button
                       ref={buttonRef}
                       key="enter-garage"
@@ -151,16 +159,31 @@ export function GarageEntry({ initialContractAddress }: { initialContractAddress
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: reducedMotion ? 0.18 : 0.55, ease: "easeOut" }}
+                      aria-describedby={canEnterWhileLoading ? "garage-entry-loading-note" : undefined}
                       onClick={() => {
                         setShowGarage(true);
                         setShowIntro(false);
                       }}
                     >
-                      <span>Enter the Garage</span>
+                      <span>{ready ? "Enter the Garage" : "Enter while artwork loads"}</span>
                       <span aria-hidden="true">↗</span>
                     </motion.button>
                   )}
                 </AnimatePresence>
+                {canEnterWhileLoading && (
+                  <p
+                    id="garage-entry-loading-note"
+                    style={{
+                      maxWidth: "36ch",
+                      margin: "0 auto 14px",
+                      color: "#c6ad87",
+                      fontSize: "12px",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    The Garage artwork is still loading. You can enter now; the background may look incomplete until it finishes.
+                  </p>
+                )}
               </div>
             </div>
 

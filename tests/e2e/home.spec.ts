@@ -5,6 +5,40 @@ async function enterGarage(page: Page) {
   await expect(page.getByRole("dialog", { name: "KAIROS startup" })).toBeHidden();
 }
 
+test("offers entry when workshop artwork stalls", async ({ page }) => {
+  await page.route("**/reference/home-image.png", async (route) => {
+    await new Promise<void>((resolve) => page.once("close", () => resolve()));
+    await route.abort().catch(() => {});
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: "Enter while artwork loads" })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Enter while artwork loads" }).click();
+  await expect(page.getByRole("dialog", { name: "KAIROS startup" })).toBeHidden();
+  await page.getByRole("button", { name: "Open Trading Engine" }).click();
+  await expect(page.getByRole("heading", { name: "Commit your market view" })).toBeVisible();
+});
+
+test("retries a failed public state read from Trading Engine without a wallet", async ({ page }) => {
+  let requests = 0;
+  await page.route("https://indexer.preprod.midnight.network/api/v4/graphql", async (route) => {
+    requests++;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { contractAction: null } }) });
+  });
+  await page.goto("/");
+  await enterGarage(page);
+  await page.getByRole("button", { name: "Open Settings" }).click();
+  await page.getByText("Local developer controls").click();
+  await page.getByLabel("Preprod contract address").fill("a".repeat(64));
+  await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("button", { name: "Open Trading Engine" }).click();
+  await page.getByRole("button", { name: "Refresh market state" }).click();
+  await expect(page.getByText(/Public market state could not be refreshed/)).toBeVisible();
+  const afterFirst = requests;
+  await page.getByRole("button", { name: "Refresh market state" }).click();
+  await expect.poll(() => requests).toBeGreaterThan(afterFirst);
+  await expect(page.getByText(/Public market state could not be refreshed/)).toBeVisible();
+});
+
 test("shows only the workshop and footer on desktop, with usable image stations", async ({ page }) => {
   await page.goto("/");
   await enterGarage(page);

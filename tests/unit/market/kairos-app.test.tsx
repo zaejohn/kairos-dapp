@@ -25,6 +25,30 @@ const publicState = (round: bigint): MarketSnapshot => ({
   treasuryActionCount: 0n, recentTreasuryActions: [],
 });
 
+it("explains a pending public read and lets the user recover in Trading Engine", async () => {
+  let finishInitial: (value: MarketSnapshot) => void = () => { throw new Error("Initial read not started"); };
+  readPublicMarket.mockImplementationOnce(() => new Promise<MarketSnapshot>((resolve) => { finishInitial = resolve; }));
+  readPublicMarket.mockResolvedValueOnce(publicState(2n));
+  render(<KairosApp initialContractAddress={"a".repeat(64)} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Trading Engine" }));
+  expect(screen.getByText(/Loading public market state from Preprod/)).toBeInTheDocument();
+  await waitFor(() => expect(readPublicMarket).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole("button", { name: "Refresh market state" }));
+  expect(await screen.findByText(/Public market state loaded/)).toBeInTheDocument();
+  await act(async () => finishInitial(publicState(1n)));
+  expect(within(screen.getByRole("region", { name: "Market status" })).getByText("02")).toBeInTheDocument();
+});
+
+it("offers a public read retry after failure without requiring a wallet", async () => {
+  readPublicMarket.mockRejectedValueOnce(new Error("Offline"));
+  readPublicMarket.mockResolvedValueOnce(publicState(1n));
+  render(<KairosApp initialContractAddress={"a".repeat(64)} />);
+  fireEvent.click(screen.getByRole("button", { name: "Open Trading Engine" }));
+  expect(await screen.findByText(/Public market state could not be refreshed/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh market state" }));
+  expect(await screen.findByText(/Public market state loaded/)).toBeInTheDocument();
+});
+
 it("explains an unavailable configured Preprod contract", async () => {
   readPublicMarket.mockRejectedValue(new Error("Indexer unavailable"));
   render(<KairosApp initialContractAddress={"a".repeat(64)} />);

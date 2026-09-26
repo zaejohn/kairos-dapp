@@ -175,6 +175,9 @@ export function KairosApp({
   const [passwordStatus, setPasswordStatus] = useState<"empty" | "checking" | "ready" | "error">("empty");
   const [existingKeyVerified, setExistingKeyVerified] = useState(false);
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
+  const [marketLoadStatus, setMarketLoadStatus] = useState<"idle" | "loading" | "ready" | "failed">(
+    isContractAddress(initialContractAddress) ? "loading" : "idle",
+  );
   const [side, setSide] = useState<0 | 1>(0);
   const [tradeSide, setTradeSide] = useState<QuoteSide>(0);
   const [tradeDirection, setTradeDirection] = useState<TradeDirection>("buy");
@@ -539,14 +542,23 @@ export function KairosApp({
       throw new AppError("CONTRACT_NOT_CONFIGURED", "This site has no valid Preprod contract configured. Contact the operator.");
     }
     const generation = ++loadGeneration.current;
-    const { readPublicMarket } = await import("@/lib/midnight/market-client");
-    const next = await readPublicMarket(address);
+    setMarketLoadStatus("loading");
+    let next: MarketSnapshot;
+    try {
+      const { readPublicMarket } = await import("@/lib/midnight/market-client");
+      next = await readPublicMarket(address);
+    } catch (cause) {
+      if (generation !== loadGeneration.current || activeAddress.current !== address) return;
+      setMarketLoadStatus("failed");
+      throw cause;
+    }
     if (
       generation !== loadGeneration.current ||
       activeAddress.current !== address
     )
       return;
     setSnapshot(next);
+    setMarketLoadStatus("ready");
     setPrepared((current) =>
       current?.round === Number(next.round) && next.phase === 0n
         ? current
@@ -577,8 +589,10 @@ export function KairosApp({
           if (
             generation === loadGeneration.current &&
             activeAddress.current === initialContractAddress
-          )
+          ) {
             setSnapshot(next);
+            setMarketLoadStatus("ready");
+          }
         })
         .catch(() => {
           if (
@@ -586,6 +600,7 @@ export function KairosApp({
             activeAddress.current === initialContractAddress
           ) {
             setSnapshot(null);
+            setMarketLoadStatus("failed");
             showToast("error", "Could not load the configured Preprod contract. Retry Load public state in Settings; if it persists, contact the operator.");
           }
         });
@@ -786,6 +801,26 @@ export function KairosApp({
                 </span>
               </div>
               <h2>Commit your market view</h2>
+              <div className="opening-step" aria-label="Public market loading">
+                <p role="status">
+                  {marketLoadStatus === "loading"
+                    ? "Loading public market state from Preprod. A slow connection can delay this read."
+                    : marketLoadStatus === "failed"
+                      ? "Public market state could not be refreshed. Check your connection and retry."
+                      : marketLoadStatus === "ready"
+                        ? "Public market state loaded. Refresh before acting if you have been away."
+                        : "No public market state loaded. Check the configured contract in Settings."}
+                  {snapshot && marketLoadStatus !== "ready" && " Displayed values are from the previous successful read."}
+                </p>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={Boolean(busy) || !isContractAddress(contractAddress)}
+                  onClick={() => void run("refreshing", () => refresh(), "Could not read this contract from the Preprod indexer.")}
+                >
+                  {busy === "refreshing" ? "Loading market state…" : "Refresh market state"}
+                </button>
+              </div>
               <p>
                 The side and salt enter a proof locally. The chain records a
                 commitment hash, its position in the round, and transaction
@@ -1655,6 +1690,7 @@ export function KairosApp({
                       const next = event.target.value.trim();
                       activeAddress.current = next;
                       loadGeneration.current++;
+                      setMarketLoadStatus("idle");
                       setContractAddress(next);
                       if (wallet) restorePositionReceipts(wallet, next);
                       setSnapshot(null);
